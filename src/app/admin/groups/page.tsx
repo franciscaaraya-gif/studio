@@ -22,7 +22,7 @@ function GroupCard({ group }: { group: VoterGroup }) {
         <CardTitle className="truncate">{group.name}</CardTitle>
       </CardHeader>
       <CardContent>
-        <p className="text-sm font-medium">{group.voters.length} Votantes</p>
+        <p className="text-sm font-medium">{(group.voters || []).length} Votantes</p>
         <p className="text-sm text-muted-foreground">
           Creado: {group.createdAt ? format(group.createdAt.toDate(), "d MMM yyyy", { locale: es }) : 'N/A'}
         </p>
@@ -106,7 +106,7 @@ function GroupsList() {
             {groups.map((group) => (
               <TableRow key={group.id}>
                 <TableCell className="font-medium max-w-sm truncate">{group.name}</TableCell>
-                <TableCell>{group.voters.length} Votantes</TableCell>
+                <TableCell>{(group.voters || []).length} Votantes</TableCell>
                 <TableCell>{group.createdAt ? format(group.createdAt.toDate(), "d MMM, yyyy", { locale: es }) : 'N/A'}</TableCell>
                 <TableCell className="text-right">
                   <DropdownMenu>
