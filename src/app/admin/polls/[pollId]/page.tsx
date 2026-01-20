@@ -1,8 +1,13 @@
+export const dynamic = 'force-dynamic';
+
+// This function can be removed if you are not using generateStaticParams
+// export async function generateStaticParams() {
+//   return [];
+// }
+
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
-
-export const dynamic = 'force-dynamic';
 
 export default function PollDetailsPage() {
   return (

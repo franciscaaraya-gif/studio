@@ -1,11 +1,11 @@
+export const dynamic = 'force-dynamic';
+
 import { Suspense } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import Link from 'next/link';
 import { ElectorIcon } from '@/components/icons';
 import { Button } from '@/components/ui/button';
 import { ArrowLeft } from 'lucide-react';
-
-export const dynamic = 'force-dynamic';
 
 function VotePageClient() {
     const headerContent = (
