@@ -24,7 +24,7 @@ export default function AdminLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const { user, isLoaded } = useUser();
+  const { user } = useUser();
   const router = useRouter();
   const pathname = usePathname();
 
