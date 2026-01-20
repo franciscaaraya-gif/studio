@@ -1,12 +1,14 @@
 "use client";
 
-import { useEffect } from "react";
+import React, { useEffect } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { AdminSidebar } from "@/components/layout/AdminSidebar";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import Link from "next/link";
 import { ElectorIcon } from "@/components/icons";
 import { useUser } from "@/firebase";
+
+
 
 function AdminLoadingScreen() {
   return (
