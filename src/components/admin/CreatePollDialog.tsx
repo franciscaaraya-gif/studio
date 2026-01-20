@@ -287,7 +287,7 @@ export function CreatePollDialog() {
                     </FormControl>
                     <SelectContent>
                       {voterGroups?.map(group => (
-                        <SelectItem key={group.id} value={group.id}>{group.name} ({group.voters.length} votantes)</SelectItem>
+                        <SelectItem key={group.id} value={group.id}>{group.name} ({(group.voters || []).length} votantes)</SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
