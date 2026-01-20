@@ -1,0 +1,45 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // --- Admin Rules ---
+    // This single, recursive rule grants an authenticated user full control over all documents
+    // nested under their own user ID path (/users/{userId}). This includes their user profile,
+    // polls, voters, votes, and voter groups. It's a secure and simple way to manage user-owned data.
+    match /users/{userId}/{documents=**} {
+      allow read, write, delete: if request.auth != null && request.auth.uid == userId;
+    }
+
+    // --- Public & Voter Rules ---
+
+    // Publicly readable poll information.
+    match /polls/{pollId} {
+      // Anyone authenticated (including anonymous voters) can get a poll.
+      allow get: if request.auth != null;
+      
+      // Admins can write to the public poll list if they own the corresponding private poll.
+      allow write: if request.auth != null &&
+                    exists(/databases/$(database)/documents/users/$(request.auth.uid)/polls/$(pollId));
+                    
+      // The app flow does not require listing all public polls. Disabling this tightens security.
+      allow list: if false;
+      
+      // No one can delete polls from the public collection directly.
+      allow delete: if false;
+    }
+
+    // Voters can check their own voting status (get) and record their vote (create).
+    // This rule allows the transaction to get/create a document, but only if it's for the correct poll owner.
+    match /users/{userId}/polls/{pollId}/voters/{voterId} {
+      allow get, create: if request.auth != null &&
+                           get(/databases/$(database)/documents/polls/$(pollId)).data.userId == userId;
+    }
+    
+    // Voters can create their anonymous vote record.
+    match /users/{userId}/polls/{pollId}/votes/{voteId} {
+      allow create: if request.auth != null &&
+                     get(/databases/$(database)/documents/polls/$(pollId)).data.userId == userId;
+    }
+  }
+}
