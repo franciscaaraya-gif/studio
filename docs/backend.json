@@ -29,7 +29,20 @@
         "status": {
           "type": "string",
           "description": "The status of the poll (e.g., open, closed).",
-          "format": "string"
+          "enum": ["draft", "active", "closed"]
+        },
+        "pollType": {
+          "type": "string",
+          "description": "The type of poll (simple or multiple choice).",
+          "enum": ["simple", "multiple"]
+        },
+        "maxSelections": {
+          "type": "number",
+          "description": "Maximum number of options a voter can select in a multiple choice poll."
+        },
+        "groupId": {
+            "type": "string",
+            "description": "The ID of the voter group this poll is for."
         },
         "adminId": {
           "type": "string",
@@ -46,6 +59,8 @@
         "question",
         "options",
         "status",
+        "pollType",
+        "groupId",
         "adminId",
         "createdAt"
       ]
@@ -58,7 +73,7 @@
       "properties": {
         "id": {
           "type": "string",
-          "description": "Unique identifier for the voter."
+          "description": "Unique identifier for the voter record."
         },
         "pollId": {
           "type": "string",
@@ -66,7 +81,7 @@
         },
         "voterId": {
           "type": "string",
-          "description": "Unique identifier for the voter."
+          "description": "The business-logic unique identifier for the voter."
         },
         "hasVoted": {
           "type": "boolean",
@@ -94,15 +109,18 @@
           "type": "string",
           "description": "Reference to the Poll this vote belongs to. (Relationship: Poll 1:N Vote)"
         },
-        "selectedOption": {
-          "type": "string",
-          "description": "The option selected by the voter."
+        "selectedOptions": {
+          "type": "array",
+          "description": "The option(s) selected by the voter.",
+          "items": {
+            "type": "string"
+          }
         }
       },
       "required": [
         "id",
         "pollId",
-        "selectedOption"
+        "selectedOptions"
       ]
     },
     "Admin": {

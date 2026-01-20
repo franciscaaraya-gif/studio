@@ -4,16 +4,17 @@ import { collection, query, orderBy } from 'firebase/firestore';
 import Link from 'next/link';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
-import { MoreHorizontal, PlusCircle, Users } from 'lucide-react';
+import { MoreHorizontal, Users } from 'lucide-react';
 
 import { useFirestore, useCollection, useUser, useMemoFirebase } from '@/firebase';
-import { Poll } from '@/lib/types';
+import { Poll, VoterGroup } from '@/lib/types';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Skeleton } from '@/components/ui/skeleton';
+import { CreatePollDialog } from '@/components/admin/CreatePollDialog';
 
 
 const statusVariant: { [key: string]: 'default' | 'secondary' | 'outline' } = {
@@ -58,9 +59,16 @@ function PollsList() {
     return query(collection(firestore, 'admins', user.uid, 'polls'), orderBy('createdAt', 'desc'));
   }, [firestore, user]);
 
-  const { data: polls, isLoading } = useCollection<Poll>(pollsQuery);
+  const groupsQuery = useMemoFirebase(() => {
+    if (!firestore || !user) return null;
+    return query(collection(firestore, 'admins', user.uid, 'groups'));
+  }, [firestore, user]);
 
-  if (isLoading) {
+  const { data: polls, isLoading: pollsLoading } = useCollection<Poll>(pollsQuery);
+  const { data: groups, isLoading: groupsLoading } = useCollection<VoterGroup>(groupsQuery);
+
+
+  if (pollsLoading || groupsLoading) {
     // Muestra el esqueleto de carga mientras se obtienen los datos
     // Coincide con el `loading.tsx` para una transición suave.
     return (
@@ -92,21 +100,26 @@ function PollsList() {
       </>
     );
   }
-
+  
   if (!polls || polls.length === 0) {
+    const noGroups = !groups || groups.length === 0;
     return (
       <div className="h-40 text-center flex flex-col justify-center items-center space-y-3 border-2 border-dashed rounded-lg">
-        <h3 className="text-lg font-semibold">Aún no tienes encuestas</h3>
+        <h3 className="text-lg font-semibold">{noGroups ? "Primero crea un grupo" : "Aún no tienes encuestas"}</h3>
         <p className="text-muted-foreground text-sm max-w-md">
-          Para crear una encuesta, primero necesitas organizar a tus participantes en
-          {' '}<Link href="/admin/groups" className="font-medium text-primary hover:underline">grupos de votantes</Link>.
+          {noGroups
+            ? "Para crear una encuesta, primero necesitas organizar a tus participantes en grupos de votantes."
+            : "¡Es hora de crear tu primera encuesta para que tus grupos puedan votar!"
+          }
         </p>
-        <Button asChild>
-          <Link href="/admin/groups">
-            <Users className="mr-2 h-4 w-4" />
-            Ir a Grupos
-          </Link>
-        </Button>
+        {noGroups && (
+            <Button asChild>
+                <Link href="/admin/groups">
+                    <Users className="mr-2 h-4 w-4" />
+                    Ir a Grupos
+                </Link>
+            </Button>
+        )}
       </div>
     );
   }
@@ -167,10 +180,7 @@ export default function DashboardPage() {
         <CardHeader>
           <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
             <CardTitle>Tus Encuestas</CardTitle>
-            <Button className="w-full sm:w-auto" disabled>
-              <PlusCircle className="mr-2 h-4 w-4" />
-              Crear Encuesta
-            </Button>
+            <CreatePollDialog />
           </div>
         </CardHeader>
         <CardContent>
