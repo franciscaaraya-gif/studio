@@ -1,8 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
-import { signOut } from "firebase/auth";
+import { usePathname } from "next/navigation";
 import { BarChart2, LogOut, Settings, Users } from "lucide-react";
 
 import {
@@ -14,25 +13,10 @@ import {
   SidebarMenuItem,
   SidebarMenuButton,
 } from "@/components/ui/sidebar";
-import { useAuth } from "@/firebase";
-import { useToast } from "@/hooks/use-toast";
 import { ElectorIcon } from "@/components/icons";
 
 export function AdminSidebar() {
   const pathname = usePathname();
-  const router = useRouter();
-  const auth = useAuth();
-  const { toast } = useToast();
-
-  const handleLogout = async () => {
-    try {
-      await signOut(auth);
-      toast({ title: "Cierre de sesión exitoso." });
-      router.push("/admin/login");
-    } catch (error) {
-      toast({ variant: "destructive", title: "Fallo al cerrar sesión.", description: "Por favor, inténtalo de nuevo." });
-    }
-  };
 
   return (
     <Sidebar>
@@ -89,9 +73,11 @@ export function AdminSidebar() {
       <SidebarFooter>
          <SidebarMenu>
             <SidebarMenuItem>
-                <SidebarMenuButton onClick={handleLogout} tooltip="Cerrar Sesión">
+                <SidebarMenuButton asChild tooltip="Volver al Inicio">
+                  <Link href="/">
                     <LogOut />
-                    <span>Cerrar Sesión</span>
+                    <span>Volver al Inicio</span>
+                  </Link>
                 </SidebarMenuButton>
             </SidebarMenuItem>
          </SidebarMenu>

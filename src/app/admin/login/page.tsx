@@ -1,8 +1,8 @@
-import { AdminLoginForm } from "@/components/auth/AdminLoginForm";
 import Link from "next/link";
 import { ElectorIcon } from "@/components/icons";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft } from "lucide-react";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 
 export default function AdminLoginPage() {
   return (
@@ -14,7 +14,21 @@ export default function AdminLoginPage() {
               <span className="text-2xl font-bold tracking-tight text-primary font-headline">E-lector</span>
             </Link>
         </div>
-        <AdminLoginForm />
+        <Card>
+          <CardHeader>
+            <CardTitle>Funcionalidad de Acceso Eliminada</CardTitle>
+            <CardDescription>
+              La autenticación de administrador ha sido removida junto con la integración de Firebase.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Button variant="outline" asChild className="w-full">
+              <Link href="/admin/dashboard">
+                Ir al Panel de Control
+              </Link>
+            </Button>
+          </CardContent>
+        </Card>
         <div className="mt-4 text-center">
             <Button variant="link" asChild>
                 <Link href="/">
