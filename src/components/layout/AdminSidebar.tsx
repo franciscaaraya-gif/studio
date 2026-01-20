@@ -1,8 +1,10 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { BarChart2, LogOut, Settings, Users } from "lucide-react";
+import { useAuth } from "@/firebase";
+import { signOut } from "firebase/auth";
 
 import {
   Sidebar,
@@ -17,6 +19,16 @@ import { ElectorIcon } from "@/components/icons";
 
 export function AdminSidebar() {
   const pathname = usePathname();
+  const auth = useAuth();
+  const router = useRouter();
+
+  const handleLogout = async () => {
+    if (auth) {
+      await signOut(auth);
+      // The layout will detect the user is logged out and redirect to /admin/login
+      router.push('/admin/login');
+    }
+  };
 
   return (
     <Sidebar>
@@ -73,11 +85,9 @@ export function AdminSidebar() {
       <SidebarFooter>
          <SidebarMenu>
             <SidebarMenuItem>
-                <SidebarMenuButton asChild tooltip="Volver al Inicio">
-                  <Link href="/">
-                    <LogOut />
-                    <span>Volver al Inicio</span>
-                  </Link>
+                <SidebarMenuButton onClick={handleLogout} tooltip="Cerrar Sesión">
+                  <LogOut />
+                  <span>Cerrar Sesión</span>
                 </SidebarMenuButton>
             </SidebarMenuItem>
          </SidebarMenu>
