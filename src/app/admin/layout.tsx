@@ -2,7 +2,7 @@
 
 import { useEffect } from "react";
 import { useRouter, usePathname } from "next/navigation";
-import useUserHook from "@/firebase/auth/useUserHook";
+import { useUserHook } from "@/firebase/auth/useUserHook";
 
 export default function AdminLayout({
   children,
@@ -17,7 +17,7 @@ export default function AdminLayout({
     if (!loading && !user && pathname !== "/admin/login") {
       router.replace("/admin/login");
     }
-  }, [loading, user, pathname, router]);
+  }, [user, loading, pathname, router]);
 
   if (loading) {
     return <p>Cargando...</p>;
