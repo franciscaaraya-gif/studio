@@ -131,51 +131,51 @@ service cloud.firestore {
       allow create: if isOwner(adminId) && hasValidAdminDataOnCreate(adminId);
       allow update: if isExistingOwner(adminId) && isAdminDataImmutable();
       allow delete: if isExistingOwner(adminId);
-    }
 
-    /**
-     * @description Manages polls created by a specific admin.
-     * @path /admins/{adminId}/polls/{pollId}
-     * @allow (create) An admin can create a new poll under their own ID. `(auth.uid == adminId)`
-     * @deny (create) An admin cannot create a poll under another admin's ID. `(auth.uid != adminId)`
-     * @principle Restricts access to a user's own data tree. Only the owning admin can manage their polls.
-     */
-    match /admins/{adminId}/polls/{pollId} {
-      allow get: if isOwner(adminId);
-      allow list: if isOwner(adminId);
-      allow create: if isOwner(adminId) && hasValidPollDataOnCreate(adminId);
-      allow update: if isExistingOwner(adminId) && isPollDataImmutable();
-      allow delete: if isExistingOwner(adminId);
-    }
+        /**
+         * @description Manages polls created by a specific admin.
+         * @path /admins/{adminId}/polls/{pollId}
+         * @allow (create) An admin can create a new poll under their own ID. `(auth.uid == adminId)`
+         * @deny (create) An admin cannot create a poll under another admin's ID. `(auth.uid != adminId)`
+         * @principle Restricts access to a user's own data tree. Only the owning admin can manage their polls.
+         */
+        match /polls/{pollId} {
+          allow get: if isOwner(adminId);
+          allow list: if isOwner(adminId);
+          allow create: if isOwner(adminId) && hasValidPollDataOnCreate(adminId);
+          allow update: if isExistingOwner(adminId) && isPollDataImmutable();
+          allow delete: if isExistingOwner(adminId);
 
-    /**
-     * @description Manages the list of voters for a specific poll.
-     * @path /admins/{adminId}/polls/{pollId}/voters/{voterId}
-     * @allow (update) The poll admin can update a voter's status (e.g., hasVoted). `(auth.uid == adminId)`
-     * @deny (update) Any user other than the poll admin cannot modify the voter list. `(auth.uid != adminId)`
-     * @principle Path-based ownership. Access is determined by the adminId in the path, ensuring only the poll creator can manage participants.
-     */
-    match /admins/{adminId}/polls/{pollId}/voters/{voterId} {
-      allow get: if isOwner(adminId);
-      allow list: if isOwner(adminId);
-      allow create: if isOwner(adminId) && hasValidVoterDataOnCreate(pollId);
-      allow update: if isExistingOwner(adminId) && isVoterDataImmutable();
-      allow delete: if isExistingOwner(adminId);
-    }
+            /**
+             * @description Manages the list of voters for a specific poll.
+             * @path /admins/{adminId}/polls/{pollId}/voters/{voterId}
+             * @allow (update) The poll admin can update a voter's status (e.g., hasVoted). `(auth.uid == adminId)`
+             * @deny (update) Any user other than the poll admin cannot modify the voter list. `(auth.uid != adminId)`
+             * @principle Path-based ownership. Access is determined by the adminId in the path, ensuring only the poll creator can manage participants.
+             */
+            match /voters/{voterId} {
+                allow get: if isOwner(adminId);
+                allow list: if isOwner(adminId);
+                allow create: if isOwner(adminId) && hasValidVoterDataOnCreate(pollId);
+                allow update: if isExistingOwner(adminId) && isVoterDataImmutable();
+                allow delete: if isExistingOwner(adminId);
+            }
 
-    /**
-     * @description Manages anonymous votes for a specific poll.
-     * @path /admins/{adminId}/polls/{pollId}/votes/{voteId}
-     * @allow (create) Any signed-in user (including anonymous) can create a new vote.
-     * @deny (get, list, update) A voter cannot read, list, or change any votes, ensuring anonymity and integrity.
-     * @principle Public create with private read. Allows for write-only submissions from any user, while restricting data management to the owner.
-     */
-    match /admins/{adminId}/polls/{pollId}/votes/{voteId} {
-      allow get: if isOwner(adminId);
-      allow list: if isOwner(adminId);
-      allow create: if isSignedIn() && hasValidVoteDataOnCreate(pollId);
-      allow update: if false;
-      allow delete: if isExistingOwner(adminId);
+            /**
+             * @description Manages anonymous votes for a specific poll.
+             * @path /admins/{adminId}/polls/{pollId}/votes/{voteId}
+             * @allow (create) Any signed-in user (including anonymous) can create a new vote.
+             * @deny (get, list, update) A voter cannot read, list, or change any votes, ensuring anonymity and integrity.
+             * @principle Public create with private read. Allows for write-only submissions from any user, while restricting data management to the owner.
+             */
+            match /votes/{voteId} {
+                allow get: if isOwner(adminId);
+                allow list: if isOwner(adminId);
+                allow create: if isSignedIn() && hasValidVoteDataOnCreate(pollId);
+                allow update: if false;
+                allow delete: if isExistingOwner(adminId);
+            }
+        }
     }
   }
 }
