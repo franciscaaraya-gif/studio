@@ -76,19 +76,21 @@ export function CreateGroupDialog() {
         const workbook = XLSX.read(data, { type: 'array' });
         const sheetName = workbook.SheetNames[0];
         const worksheet = workbook.Sheets[sheetName];
-        const json = XLSX.utils.sheet_to_json<any>(worksheet);
+        const rows = XLSX.utils.sheet_to_json<any[]>(worksheet, { header: 1 });
 
-        const voters = json.map(row => ({
-          id: String(row.id || '').trim(),
-          nombre: String(row.nombre || '').trim(),
-          apellido: String(row.apellido || '').trim(),
-        })).filter(v => v.id && v.nombre); // Basic validation
+        const voters = rows
+            .filter(row => Array.isArray(row) && row[0]) // Filter out empty rows or rows without an ID
+            .map(row => ({
+                id: String(row[0]).trim(),
+                apellido: String(row[1] || '').trim(),
+                nombre: String(row[2] || '').trim(),
+            }));
 
-        if(voters.length === 0){
+        if (voters.length === 0){
             toast({
                 variant: 'destructive',
                 title: 'Archivo no válido',
-                description: "No se encontraron votantes válidos. Asegúrate que el archivo contenga las columnas 'id' y 'nombre'."
+                description: "No se encontraron votantes válidos. Asegúrate de que la primera columna de tu archivo contenga los IDs."
             })
             setFileName('');
             return;
@@ -266,7 +268,7 @@ export function CreateGroupDialog() {
                     </div>
                 )}
                 <FormDescription>
-                    El archivo debe tener las columnas: 'id', 'nombre', y 'apellido'.
+                    Se usará la primera columna para el 'id', la segunda para 'apellido' y la tercera para 'nombre'.
                 </FormDescription>
             </FormItem>
 
