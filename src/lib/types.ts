@@ -16,10 +16,16 @@ export type Poll = {
   adminId: string;
 };
 
+export type VoterInfo = {
+  id: string;
+  nombre: string;
+  apellido: string;
+};
+
 export type VoterGroup = {
   id: string;
   name: string;
   adminId: string;
-  voterIds: string[];
+  voters: VoterInfo[];
   createdAt: Timestamp;
 };

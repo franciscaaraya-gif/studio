@@ -127,22 +127,30 @@
       ]
     },
     "VoterGroup": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
-        "title": "Voter Group",
-        "type": "object",
-        "description": "Represents a reusable group of voters created by an admin.",
-        "properties": {
-          "id": { "type": "string", "description": "Unique identifier for the voter group." },
-          "name": { "type": "string", "description": "The name of the voter group." },
-          "adminId": { "type": "string", "description": "The ID of the admin who owns this group." },
-          "voterIds": {
-            "type": "array",
-            "description": "A list of unique identifiers for the voters in this group.",
-            "items": { "type": "string" }
-          },
-          "createdAt": { "type": "string", "format": "date-time", "description": "Timestamp of when the group was created." }
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Voter Group",
+      "type": "object",
+      "description": "Represents a reusable group of voters created by an admin.",
+      "properties": {
+        "id": { "type": "string", "description": "Unique identifier for the voter group." },
+        "name": { "type": "string", "description": "The name of the voter group." },
+        "adminId": { "type": "string", "description": "The ID of the admin who owns this group." },
+        "voters": {
+          "type": "array",
+          "description": "A list of voters in this group.",
+          "items": {
+            "type": "object",
+            "properties": {
+              "id": { "type": "string", "description": "The unique identifier for the voter." },
+              "nombre": { "type": "string", "description": "The first name of the voter." },
+              "apellido": { "type": "string", "description": "The last name of the voter." }
+            },
+            "required": ["id", "nombre", "apellido"]
+          }
         },
-        "required": ["id", "name", "adminId", "voterIds", "createdAt"]
+        "createdAt": { "type": "string", "format": "date-time", "description": "Timestamp of when the group was created." }
+      },
+      "required": ["id", "name", "adminId", "voters", "createdAt"]
     }
   },
   "auth": {
