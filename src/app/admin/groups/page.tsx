@@ -1,19 +1,34 @@
 'use client';
 
-import { collection, query, orderBy } from 'firebase/firestore';
+import { collection, query, orderBy, doc, deleteDoc } from 'firebase/firestore';
 import Link from 'next/link';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { MoreHorizontal } from 'lucide-react';
+import { useState } from 'react';
 
 import { useFirestore, useCollection, useUser, useMemoFirebase } from '@/firebase';
 import { VoterGroup } from '@/lib/types';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
+import { Button, buttonVariants } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Skeleton } from '@/components/ui/skeleton';
 import { CreateGroupDialog } from '@/components/admin/CreateGroupDialog';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { useToast } from '@/hooks/use-toast';
+import { errorEmitter } from '@/firebase/error-emitter';
+import { FirestorePermissionError } from '@/firebase/errors';
+
 
 function GroupCard({ group }: { group: VoterGroup }) {
   return (
@@ -28,7 +43,7 @@ function GroupCard({ group }: { group: VoterGroup }) {
         </p>
       </CardContent>
       <CardFooter>
-        <Button asChild className="w-full" disabled>
+        <Button asChild className="w-full">
           <Link href={`/admin/groups/${group.id}`}>Ver Detalles</Link>
         </Button>
       </CardFooter>
@@ -39,6 +54,9 @@ function GroupCard({ group }: { group: VoterGroup }) {
 function GroupsList() {
   const firestore = useFirestore();
   const { user } = useUser();
+  const { toast } = useToast();
+  const [isAlertOpen, setIsAlertOpen] = useState(false);
+  const [groupToDelete, setGroupToDelete] = useState<VoterGroup | null>(null);
 
   const groupsQuery = useMemoFirebase(() => {
     if (!firestore || !user) return null;
@@ -46,6 +64,35 @@ function GroupsList() {
   }, [firestore, user]);
 
   const { data: groups, isLoading } = useCollection<VoterGroup>(groupsQuery);
+
+  const handleDeleteClick = (group: VoterGroup) => {
+    setGroupToDelete(group);
+    setIsAlertOpen(true);
+  };
+
+  const handleDeleteConfirm = async () => {
+    if (!groupToDelete || !firestore || !user) return;
+    
+    const groupRef = doc(firestore, 'admins', user.uid, 'groups', groupToDelete.id);
+
+    try {
+        await deleteDoc(groupRef);
+        toast({
+            title: "Grupo Eliminado",
+            description: `El grupo "${groupToDelete.name}" ha sido eliminado.`,
+        });
+    } catch(error: any) {
+        const permissionError = new FirestorePermissionError({
+            path: groupRef.path,
+            operation: 'delete',
+        });
+        errorEmitter.emit('permission-error', permissionError);
+    } finally {
+        setIsAlertOpen(false);
+        setGroupToDelete(null);
+    }
+  };
+
 
   if (isLoading) {
     return (
@@ -117,9 +164,16 @@ function GroupsList() {
                       </Button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end">
-                      <DropdownMenuItem disabled>Ver detalles</DropdownMenuItem>
+                      <DropdownMenuItem asChild>
+                        <Link href={`/admin/groups/${group.id}`}>Ver detalles</Link>
+                      </DropdownMenuItem>
                       <DropdownMenuItem disabled>Editar</DropdownMenuItem>
-                      <DropdownMenuItem className="text-destructive" disabled>Eliminar</DropdownMenuItem>
+                      <DropdownMenuItem
+                        className="text-destructive"
+                        onClick={() => handleDeleteClick(group)}
+                      >
+                        Eliminar
+                      </DropdownMenuItem>
                     </DropdownMenuContent>
                   </DropdownMenu>
                 </TableCell>
@@ -128,6 +182,23 @@ function GroupsList() {
           </TableBody>
         </Table>
       </div>
+      <AlertDialog open={isAlertOpen} onOpenChange={setIsAlertOpen}>
+        <AlertDialogContent>
+            <AlertDialogHeader>
+                <AlertDialogTitle>¿Estás seguro?</AlertDialogTitle>
+                <AlertDialogDescription>
+                    Esta acción no se puede deshacer. Se eliminará permanentemente el grupo
+                    <span className="font-semibold"> {groupToDelete?.name}</span>.
+                </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+                <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                <AlertDialogAction onClick={handleDeleteConfirm} className={buttonVariants({ variant: "destructive" })}>
+                    Eliminar
+                </AlertDialogAction>
+            </AlertDialogFooter>
+        </AlertDialogContent>
+    </AlertDialog>
     </>
   );
 }

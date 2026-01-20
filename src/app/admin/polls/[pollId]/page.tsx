@@ -2,18 +2,31 @@
 
 import { useParams } from 'next/navigation';
 import { useUser, useDoc, useCollection, useFirestore, useMemoFirebase } from '@/firebase';
-import { doc, collection } from 'firebase/firestore';
+import { doc, collection, updateDoc } from 'firebase/firestore';
 import { Poll, VoterGroup, VoterInfo } from '@/lib/types';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
+import { Button, buttonVariants } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { CheckCircle, XCircle, Copy, Users, Link as LinkIcon } from 'lucide-react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { useToast } from '@/hooks/use-toast';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import PollDetailsLoading from './loading';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { errorEmitter } from '@/firebase/error-emitter';
+import { FirestorePermissionError } from '@/firebase/errors';
+import { PollResultsDialog } from '@/components/admin/PollResultsDialog';
 
 const statusVariant: { [key: string]: 'default' | 'secondary' | 'outline' } = {
   active: 'default',
@@ -147,6 +160,9 @@ export default function PollDetailsPage() {
   const firestore = useFirestore();
   const { toast } = useToast();
   const [pollUrl, setPollUrl] = useState('');
+  const [showResults, setShowResults] = useState(false);
+  const [isConfirmAlertOpen, setConfirmAlertOpen] = useState(false);
+  const [actionToConfirm, setActionToConfirm] = useState<'activate' | 'close' | null>(null);
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
@@ -180,6 +196,36 @@ export default function PollDetailsPage() {
     toast({ title: 'Enlace de la encuesta copiado!' });
   };
   
+  const handleStatusChangeConfirm = async () => {
+    if (!poll || !firestore || !user || !actionToConfirm) return;
+    
+    const newStatus = actionToConfirm === 'activate' ? 'active' : 'closed';
+    const pollRef = doc(firestore, 'admins', user.uid, 'polls', poll.id);
+
+    try {
+        await updateDoc(pollRef, { status: newStatus });
+        toast({
+            title: "Estado Actualizado",
+            description: `La encuesta ahora está ${newStatus === 'active' ? 'activa' : 'cerrada'}.`,
+        });
+    } catch (error) {
+        const permissionError = new FirestorePermissionError({
+            path: pollRef.path,
+            operation: 'update',
+            requestResourceData: { status: newStatus }
+        });
+        errorEmitter.emit('permission-error', permissionError);
+    } finally {
+        setConfirmAlertOpen(false);
+        setActionToConfirm(null);
+    }
+  }
+
+  const openConfirmationDialog = (action: 'activate' | 'close') => {
+    setActionToConfirm(action);
+    setConfirmAlertOpen(true);
+  }
+
   if (isUserLoading || pollLoading || groupLoading || votersStatusLoading) {
     return <PollDetailsLoading />;
   }
@@ -219,6 +265,12 @@ export default function PollDetailsPage() {
               <CardDescription>Grupo de Votantes: {group?.name || 'Cargando...'}</CardDescription>
             </div>
             <div className="flex items-center space-x-2 shrink-0">
+                {poll.status === 'draft' && (
+                    <Button onClick={() => openConfirmationDialog('activate')}>Activar Encuesta</Button>
+                )}
+                {poll.status === 'active' && (
+                    <Button onClick={() => openConfirmationDialog('close')} variant="destructive">Cerrar Encuesta</Button>
+                )}
                 <Badge variant={statusVariant[poll.status] || 'secondary'} className="capitalize">
                     {statusText[poll.status] || poll.status}
                 </Badge>
@@ -255,14 +307,35 @@ export default function PollDetailsPage() {
                         <LinkIcon className="mr-2 h-4 w-4" />
                         Copiar Enlace General
                     </Button>
-                    <Button variant="secondary" disabled className="w-full">Ver Resultados</Button>
+                    <Button onClick={() => setShowResults(true)} variant="secondary" disabled={poll.status !== 'closed'} className="w-full">
+                        Ver Resultados
+                    </Button>
                 </div>
             </div>
         </CardContent>
       </Card>
       
       {group && votersStatus && <VoterList poll={poll} group={group} votersStatus={votersStatus} />}
+      
+      {poll && <PollResultsDialog poll={poll} open={showResults} onOpenChange={setShowResults} />}
 
+      <AlertDialog open={isConfirmAlertOpen} onOpenChange={setConfirmAlertOpen}>
+        <AlertDialogContent>
+            <AlertDialogHeader>
+                <AlertDialogTitle>¿Confirmar acción?</AlertDialogTitle>
+                <AlertDialogDescription>
+                    {actionToConfirm === 'activate' && 'Al activar la encuesta, los votantes podrán empezar a emitir sus votos. ¿Deseas continuar?'}
+                    {actionToConfirm === 'close' && 'Al cerrar la encuesta, se detendrá la votación y podrás ver los resultados. ¿Deseas continuar?'}
+                </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+                <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                <AlertDialogAction onClick={handleStatusChangeConfirm}>
+                    Confirmar
+                </AlertDialogAction>
+            </AlertDialogFooter>
+        </AlertDialogContent>
+    </AlertDialog>
     </div>
   );
 }
