@@ -1,13 +1,142 @@
 export const dynamic = 'force-dynamic';
+'use client';
 
-import { Suspense } from 'react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Suspense, useEffect, useState } from 'react';
+import { useParams, useRouter, useSearchParams } from 'next/navigation';
+import { useForm, Controller } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import * as z from 'zod';
+import { collection, doc, getDoc, getDocs, query, where, writeBatch, limit, serverTimestamp, addDoc } from 'firebase/firestore';
+import { signInAnonymously } from 'firebase/auth';
+
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import Link from 'next/link';
 import { ElectorIcon } from '@/components/icons';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft } from 'lucide-react';
+import { AlertCircle, ArrowLeft, Loader2 } from 'lucide-react';
+import { Skeleton } from '@/components/ui/skeleton';
+import { useAuth, useFirestore } from '@/firebase';
+import { Poll, PollLookup, VoterStatus } from '@/lib/types';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Label } from '@/components/ui/label';
+import { Form, FormControl, FormField, FormItem, FormMessage } from '@/components/ui/form';
+import { useToast } from '@/hooks/use-toast';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 
 function VotePageClient() {
+    const { pollId } = useParams() as { pollId: string };
+    const searchParams = useSearchParams();
+    const voterId = searchParams.get('voterId');
+    const router = useRouter();
+    const { toast } = useToast();
+
+    const [poll, setPoll] = useState<Poll | null>(null);
+    const [voterDocId, setVoterDocId] = useState<string | null>(null);
+    const [adminId, setAdminId] = useState<string | null>(null);
+    const [error, setError] = useState<string>('');
+    const [isLoading, setIsLoading] = useState(true);
+
+    const firestore = useFirestore();
+    const auth = useAuth();
+
+    // Anonymous sign-in effect
+    useEffect(() => {
+        if (!auth || auth.currentUser) return;
+        signInAnonymously(auth).catch(err => {
+            console.error("Anonymous sign-in failed", err);
+            setError("Se requiere autenticación para votar.");
+        });
+    }, [auth]);
+
+    // Data fetching effect
+    useEffect(() => {
+        if (!firestore || !pollId || !voterId || !auth?.currentUser) return;
+
+        const fetchPollData = async () => {
+            setIsLoading(true);
+            setError('');
+            try {
+                const lookupSnap = await getDoc(doc(firestore, 'poll-lookup', pollId));
+                if (!lookupSnap.exists()) throw new Error('Encuesta no encontrada o inválida.');
+                const adminId = (lookupSnap.data() as PollLookup).adminId;
+                setAdminId(adminId);
+
+                const pollSnap = await getDoc(doc(firestore, 'admins', adminId, 'polls', pollId));
+                if (!pollSnap.exists()) throw new Error('Encuesta no encontrada o inválida.');
+                
+                const pollData = { id: pollSnap.id, ...pollSnap.data() } as Poll;
+                if (pollData.status !== 'active') throw new Error('Esta encuesta no se encuentra activa en este momento.');
+                setPoll(pollData);
+
+                const votersRef = collection(firestore, 'admins', adminId, 'polls', pollId, 'voters');
+                const q = query(votersRef, where('voterId', '==', voterId), limit(1));
+                const voterSnap = await getDocs(q);
+
+                if (voterSnap.empty) throw new Error('No eres elegible para votar en esta encuesta.');
+
+                const voterDoc = voterSnap.docs[0];
+                if ((voterDoc.data() as VoterStatus).hasVoted) throw new Error('Ya has emitido tu voto para esta encuesta.');
+
+                setVoterDocId(voterDoc.id);
+
+            } catch (err: any) {
+                setError(err.message);
+            } finally {
+                setIsLoading(false);
+            }
+        };
+
+        fetchPollData();
+    }, [firestore, auth?.currentUser, pollId, voterId]);
+
+    // Dynamic Zod schema based on poll type
+    const formSchema = z.object({
+        selectedOptions: poll?.pollType === 'simple'
+            ? z.string({ required_error: "Debes seleccionar una opción." })
+            : z.array(z.string()).min(1, "Debes seleccionar al menos una opción.").max(poll?.maxSelections || poll?.options.length || 0, `Puedes seleccionar como máximo ${poll?.maxSelections} opciones.`)
+    });
+
+    const form = useForm<z.infer<typeof formSchema>>({
+        resolver: zodResolver(formSchema),
+        defaultValues: {
+            selectedOptions: poll?.pollType === 'simple' ? undefined : [],
+        },
+    });
+
+    const { formState: { isSubmitting } } = form;
+
+    async function onSubmit(values: z.infer<typeof formSchema>) {
+        if (!firestore || !poll || !adminId || !voterDocId) {
+            toast({ variant: 'destructive', title: 'Error', description: 'No se pudo enviar el voto. Faltan datos.' });
+            return;
+        }
+
+        try {
+            const batch = writeBatch(firestore);
+
+            // 1. Add the anonymous vote
+            const votesRef = collection(firestore, 'admins', adminId, 'polls', pollId, 'votes');
+            const newVoteRef = doc(votesRef);
+            batch.set(newVoteRef, {
+                pollId: poll.id,
+                selectedOptions: Array.isArray(values.selectedOptions) ? values.selectedOptions : [values.selectedOptions],
+                createdAt: serverTimestamp(),
+            });
+
+            // 2. Mark the voter as having voted
+            const voterRef = doc(firestore, 'admins', adminId, 'polls', pollId, 'voters', voterDocId);
+            batch.update(voterRef, { hasVoted: true });
+            
+            await batch.commit();
+
+            router.push('/vote/success');
+
+        } catch (err: any) {
+            toast({ variant: 'destructive', title: 'Error al emitir el voto', description: err.message });
+        }
+    }
+    
     const headerContent = (
         <div className="flex justify-center mb-8">
             <Link href="/" className="flex items-center justify-center gap-2" prefetch={false}>
@@ -16,58 +145,154 @@ function VotePageClient() {
             </Link>
         </div>
     );
-
-    const bodyContent = (
-        <Card>
-            <CardHeader>
-                <CardTitle>Funcionalidad de Votación Deshabilitada</CardTitle>
-                <CardDescription>
-                    Esta funcionalidad requería una base de datos. Al eliminar Firebase, la votación ya no es posible.
-                </CardDescription>
-            </CardHeader>
-            <CardContent>
-                <Button asChild variant="outline" className='w-full'>
-                    <Link href="/login">
-                        <ArrowLeft className="mr-2 h-4 w-4" />
-                        Volver
-                    </Link>
-                </Button>
-            </CardContent>
-        </Card>
-    );
     
+    if (isLoading) {
+        return (
+             <div className="flex min-h-dvh flex-col items-center justify-center bg-background p-4">
+                <div className="w-full max-w-2xl">
+                    {headerContent}
+                    <LoadingSkeleton />
+                </div>
+            </div>
+        );
+    }
+    
+    if (error) {
+        return (
+            <div className="flex min-h-dvh flex-col items-center justify-center bg-background p-4">
+                <div className="w-full max-w-2xl">
+                    {headerContent}
+                    <Card>
+                        <CardHeader>
+                            <CardTitle>No se puede votar</CardTitle>
+                            <CardDescription>
+                                Ha ocurrido un problema al intentar cargar la encuesta.
+                            </CardDescription>
+                        </CardHeader>
+                        <CardContent>
+                            <Alert variant="destructive">
+                                <AlertCircle className="h-4 w-4" />
+                                <AlertTitle>Error</AlertTitle>
+                                <AlertDescription>
+                                    {error}
+                                </AlertDescription>
+                            </Alert>
+                        </CardContent>
+                        <CardFooter>
+                           <Button asChild variant="outline" className='w-full'>
+                                <Link href="/login">
+                                    <ArrowLeft className="mr-2 h-4 w-4" />
+                                    Volver
+                                </Link>
+                            </Button>
+                        </CardFooter>
+                    </Card>
+                </div>
+            </div>
+        );
+    }
+    
+    if (!poll) return null;
+
     return (
         <div className="flex min-h-dvh flex-col items-center justify-center bg-background p-4">
             <div className="w-full max-w-2xl">
                 {headerContent}
-                {bodyContent}
-            </div>
-        </div>
-    );
-}
-
-// A simple loading skeleton to show during server render and initial client load.
-function LoadingSkeleton() {
-    return (
-        <div className="flex min-h-dvh flex-col items-center justify-center bg-background p-4">
-            <div className="w-full max-w-2xl">
                 <Card>
-                    <CardHeader>
-                        <CardTitle>Cargando...</CardTitle>
-                        <CardDescription>Por favor, espera un momento.</CardDescription>
-                    </CardHeader>
-                    <CardContent className="space-y-4">
-                        <div className="h-16 w-full bg-muted animate-pulse rounded-md" />
-                        <div className="h-16 w-full bg-muted animate-pulse rounded-md" />
-                        <div className="h-12 w-full bg-muted animate-pulse rounded-md mt-4" />
-                    </CardContent>
+                    <Form {...form}>
+                        <form onSubmit={form.handleSubmit(onSubmit)}>
+                            <CardHeader>
+                                <CardTitle className="text-2xl">{poll.question}</CardTitle>
+                                <CardDescription>
+                                    {poll.pollType === 'simple'
+                                        ? 'Selecciona una opción.'
+                                        : `Puedes seleccionar hasta ${poll.maxSelections} opciones.`}
+                                </CardDescription>
+                            </CardHeader>
+                            <CardContent>
+                                <FormField
+                                    control={form.control}
+                                    name="selectedOptions"
+                                    render={({ field }) => (
+                                        <FormItem>
+                                            {poll.pollType === 'simple' ? (
+                                                <FormControl>
+                                                    <RadioGroup onValueChange={field.onChange} defaultValue={field.value} className="space-y-2">
+                                                        {poll.options.map((option) => (
+                                                            <FormItem key={option.id} className="flex items-center space-x-3 space-y-0 rounded-md border p-4 hover:bg-accent hover:text-accent-foreground has-[[data-state=checked]]:bg-primary has-[[data-state=checked]]:text-primary-foreground">
+                                                                <FormControl>
+                                                                    <RadioGroupItem value={option.id} />
+                                                                </FormControl>
+                                                                <FormLabel className="font-normal flex-1 cursor-pointer">{option.text}</FormLabel>
+                                                            </FormItem>
+                                                        ))}
+                                                    </RadioGroup>
+                                                </FormControl>
+                                            ) : (
+                                                <div className="space-y-2">
+                                                    {poll.options.map((option) => (
+                                                        <FormField
+                                                            key={option.id}
+                                                            control={form.control}
+                                                            name="selectedOptions"
+                                                            render={({ field }) => (
+                                                                <FormItem key={option.id} className="flex flex-row items-center space-x-3 space-y-0 rounded-md border p-4 hover:bg-accent hover:text-accent-foreground has-[[data-state=checked]]:bg-primary has-[[data-state=checked]]:text-primary-foreground">
+                                                                    <FormControl>
+                                                                        <Checkbox
+                                                                            checked={field.value?.includes(option.id)}
+                                                                            onCheckedChange={(checked) => {
+                                                                                const currentValue = field.value || [];
+                                                                                return checked
+                                                                                    ? field.onChange([...currentValue, option.id])
+                                                                                    : field.onChange(currentValue.filter(value => value !== option.id));
+                                                                            }}
+                                                                        />
+                                                                    </FormControl>
+                                                                    <FormLabel className="font-normal flex-1 cursor-pointer">{option.text}</FormLabel>
+                                                                </FormItem>
+                                                            )}
+                                                        />
+                                                    ))}
+                                                </div>
+                                            )}
+                                            <FormMessage className="pt-2" />
+                                        </FormItem>
+                                    )}
+                                />
+                            </CardContent>
+                            <CardFooter>
+                                <Button type="submit" disabled={isSubmitting} className="w-full">
+                                    {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                                    Emitir Voto
+                                </Button>
+                            </CardFooter>
+                        </form>
+                    </Form>
                 </Card>
             </div>
         </div>
     );
 }
 
-// This is a Server Component.
+function LoadingSkeleton() {
+    return (
+        <Card>
+            <CardHeader>
+                <Skeleton className="h-8 w-3/4" />
+                <Skeleton className="h-4 w-1/2 mt-2" />
+            </CardHeader>
+            <CardContent className="space-y-3">
+                <Skeleton className="h-14 w-full" />
+                <Skeleton className="h-14 w-full" />
+                <Skeleton className="h-14 w-full" />
+            </CardContent>
+             <CardFooter>
+                <Skeleton className="h-10 w-full" />
+            </CardFooter>
+        </Card>
+    );
+}
+
 export default function VotePage() {
   return (
     <Suspense fallback={<LoadingSkeleton />}>

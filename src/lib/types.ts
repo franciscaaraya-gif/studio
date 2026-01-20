@@ -27,7 +27,7 @@ export type VoterInfo = {
 };
 
 export type VoterGroup = {
-  id: string;
+  id:string;
   name: string;
   adminId: string;
   voters: VoterInfo[];
@@ -39,3 +39,14 @@ export type Vote = {
     pollId: string;
     selectedOptions: string[];
 }
+
+export type VoterStatus = {
+  id: string; // The document ID from the 'voters' subcollection
+  voterId: string; // The business logic ID of the voter
+  pollId: string;
+  hasVoted: boolean;
+};
+
+export type PollLookup = {
+  adminId: string;
+};

@@ -155,7 +155,7 @@ service cloud.firestore {
          * @principle Restricts access to a user's own data tree. Only the owning admin can manage their polls.
          */
         match /polls/{pollId} {
-          allow get: if isOwner(adminId);
+          allow get: if isOwner(adminId) || isSignedIn(); // Allow voters to get poll
           allow list: if isOwner(adminId);
           allow create: if isOwner(adminId) && hasValidPollDataOnCreate(adminId);
           allow update: if isExistingOwner(adminId) && isPollDataImmutable();
@@ -168,11 +168,11 @@ service cloud.firestore {
              * @deny (update) Any user other than the poll admin cannot modify the voter list. `(auth.uid != adminId)`
              * @principle Path-based ownership. Access is determined by the adminId in the path, ensuring only the poll creator can manage participants.
              */
-            match /voters/{voterId} {
-                allow get: if isOwner(adminId);
-                allow list: if isOwner(adminId);
+            match /voters/{voterDocId} {
+                allow get: if isOwner(adminId) || isSignedIn();
+                allow list: if isOwner(adminId) || isSignedIn();
                 allow create: if isOwner(adminId) && hasValidVoterDataOnCreate(pollId);
-                allow update: if isExistingOwner(adminId) && isVoterDataImmutable();
+                allow update: if isOwner(adminId) || isSignedIn();
                 allow delete: if isExistingOwner(adminId);
             }
 
@@ -206,6 +206,20 @@ service cloud.firestore {
             allow update: if isExistingOwner(adminId) && isGroupDataImmutable();
             allow delete: if isExistingOwner(adminId);
         }
+    }
+    
+    /**
+     * @description Public lookup table to find the adminId for a pollId.
+     * @path /poll-lookup/{pollId}
+     * @allow (get) Anyone can read this to find the poll's owner.
+     * @allow (create) Only the admin owner can create the lookup entry.
+     */
+    match /poll-lookup/{pollId} {
+        allow get: if true;
+        allow list: if true;
+        allow create: if isSignedIn() && request.resource.data.adminId == request.auth.uid;
+        allow update: if false;
+        allow delete: if false;
     }
   }
 }

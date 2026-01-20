@@ -169,6 +169,18 @@
         "createdAt": { "type": "string", "format": "date-time", "description": "Timestamp of when the group was created." }
       },
       "required": ["id", "name", "adminId", "voters", "createdAt"]
+    },
+    "PollLookup": {
+      "title": "Poll Lookup",
+      "type": "object",
+      "description": "A lookup document to find the adminId for a given pollId.",
+      "properties": {
+        "adminId": {
+          "type": "string",
+          "description": "The ID of the admin who created the poll."
+        }
+      },
+      "required": ["adminId"]
     }
   },
   "auth": {
@@ -279,6 +291,22 @@
             {
               "name": "groupId",
               "description": "Unique identifier for the voter group."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/poll-lookup/{pollId}",
+        "definition": {
+          "entityName": "PollLookup",
+          "schema": {
+            "$ref": "#/backend/entities/PollLookup"
+          },
+          "description": "A public lookup table to find the admin owner of a poll.",
+          "params": [
+            {
+              "name": "pollId",
+              "description": "Unique identifier for the poll."
             }
           ]
         }

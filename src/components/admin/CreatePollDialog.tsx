@@ -105,7 +105,7 @@ export function CreatePollDialog() {
         }
 
         const pollsCollection = collection(firestore, 'admins', user.uid, 'polls');
-        const newPollRef = doc(pollsCollection); // Create ref for the new poll
+        const newPollRef = doc(pollsCollection);
 
         const newPollData = {
             id: newPollRef.id,
@@ -127,15 +127,19 @@ export function CreatePollDialog() {
         // 2. Add all voters to the subcollection
         const votersSubcollectionRef = collection(firestore, 'admins', user.uid, 'polls', newPollRef.id, 'voters');
         selectedGroup.voters.forEach(voter => {
-            const newVoterDocRef = doc(votersSubcollectionRef); // Create a new doc ref for each voter
+            const newVoterDocRef = doc(votersSubcollectionRef);
             batch.set(newVoterDocRef, {
-                voterId: voter.id, // The business logic ID from the group
+                voterId: voter.id,
                 pollId: newPollRef.id,
                 hasVoted: false,
             });
         });
+
+        // 3. Create public lookup document
+        const lookupRef = doc(firestore, 'poll-lookup', newPollRef.id);
+        batch.set(lookupRef, { adminId: user.uid });
         
-        // 3. Commit the batch
+        // 4. Commit the batch
         await batch.commit();
 
         toast({

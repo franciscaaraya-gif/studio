@@ -2,13 +2,13 @@
 
 import { useParams } from 'next/navigation';
 import { useUser, useDoc, useCollection, useFirestore, useMemoFirebase } from '@/firebase';
-import { doc, collection, updateDoc } from 'firebase/firestore';
-import { Poll, VoterGroup, VoterInfo } from '@/lib/types';
+import { doc, collection, updateDoc, getDoc } from 'firebase/firestore';
+import { Poll, VoterGroup, VoterInfo, VoterStatus } from '@/lib/types';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button, buttonVariants } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { CheckCircle, XCircle, Copy, Users, Link as LinkIcon } from 'lucide-react';
+import { CheckCircle, XCircle, Copy, Users, Link as LinkIcon, QrCode } from 'lucide-react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { useToast } from '@/hooks/use-toast';
@@ -24,6 +24,13 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader as QrDialogHeader,
+  DialogTitle as QrDialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog"
 import { errorEmitter } from '@/firebase/error-emitter';
 import { FirestorePermissionError } from '@/firebase/errors';
 import { PollResultsDialog } from '@/components/admin/PollResultsDialog';
@@ -42,7 +49,7 @@ const statusText: { [key: string]: string } = {
 
 type MergedVoter = VoterInfo & { hasVoted: boolean };
 
-function VoterList({ poll, group, votersStatus }: { poll: Poll, group: VoterGroup, votersStatus: { voterId: string; hasVoted: boolean }[] }) {
+function VoterList({ poll, group, votersStatus }: { poll: Poll, group: VoterGroup, votersStatus: VoterStatus[] }) {
     const [mergedVoters, setMergedVoters] = useState<MergedVoter[]>([]);
     const { toast } = useToast();
 
@@ -162,6 +169,7 @@ export default function PollDetailsPage() {
   const [pollUrl, setPollUrl] = useState('');
   const [showResults, setShowResults] = useState(false);
   const [isConfirmAlertOpen, setConfirmAlertOpen] = useState(false);
+  const [isQrModalOpen, setQrModalOpen] = useState(false);
   const [actionToConfirm, setActionToConfirm] = useState<'activate' | 'close' | null>(null);
 
   useEffect(() => {
@@ -189,7 +197,7 @@ export default function PollDetailsPage() {
     return collection(firestore, 'admins', user.uid, 'polls', pollId, 'voters');
   }, [firestore, user, pollId]);
 
-  const { data: votersStatus, isLoading: votersStatusLoading, error: votersStatusError } = useCollection(votersStatusRef);
+  const { data: votersStatus, isLoading: votersStatusLoading, error: votersStatusError } = useCollection<VoterStatus>(votersStatusRef);
 
   const copyPollUrl = () => {
     navigator.clipboard.writeText(pollUrl);
@@ -262,7 +270,7 @@ export default function PollDetailsPage() {
           <div className="flex flex-col sm:flex-row justify-between items-start gap-4">
             <div>
               <CardTitle className="text-2xl mb-2">{poll.question}</CardTitle>
-              <CardDescription>Grupo de Votantes: {group?.name || 'Cargando...'}</CardDescription>
+              <CardDescription>Grupo de Votantes: {group?.name || 'Cargando...'} ({(group?.voters || []).length} votantes)</CardDescription>
             </div>
             <div className="flex items-center space-x-2 shrink-0">
                 {poll.status === 'draft' && (
@@ -290,18 +298,39 @@ export default function PollDetailsPage() {
                 )}
             </div>
             <div className='flex flex-col sm:flex-row gap-4 items-center sm:justify-end'>
-                <div className='text-center'>
-                    {pollUrl && (
-                        <Image 
-                            src={`https://api.qrserver.com/v1/create-qr-code/?size=128x128&data=${encodeURIComponent(pollUrl)}`}
-                            alt="QR Code para la encuesta"
-                            width={128}
-                            height={128}
-                            className='rounded-md border p-1'
-                        />
-                    )}
-                    <p className='text-xs text-muted-foreground mt-2'>Escanear para ir a la encuesta</p>
-                </div>
+                <Dialog open={isQrModalOpen} onOpenChange={setQrModalOpen}>
+                  <DialogTrigger asChild>
+                    <button className='text-center border-2 border-transparent hover:border-primary rounded-lg p-1 transition-colors'>
+                        {pollUrl && (
+                            <Image 
+                                src={`https://api.qrserver.com/v1/create-qr-code/?size=128x128&data=${encodeURIComponent(pollUrl)}`}
+                                alt="QR Code para la encuesta"
+                                width={128}
+                                height={128}
+                                className='rounded-md'
+                            />
+                        )}
+                        <p className='text-xs text-muted-foreground mt-2 flex items-center justify-center gap-1'><QrCode className="h-3 w-3"/> Ampliar QR</p>
+                    </button>
+                  </DialogTrigger>
+                  <DialogContent className="sm:max-w-md">
+                        <QrDialogHeader>
+                            <QrDialogTitle>Escanear para votar</QrDialogTitle>
+                        </QrDialogHeader>
+                        <div className="flex flex-col items-center justify-center p-4">
+                             {pollUrl && (
+                                <Image 
+                                    src={`https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(pollUrl)}`}
+                                    alt="QR Code para la encuesta"
+                                    width={300}
+                                    height={300}
+                                    className='rounded-lg border p-2'
+                                />
+                            )}
+                            <p className="text-sm text-muted-foreground mt-4 break-all">{pollUrl}</p>
+                        </div>
+                  </DialogContent>
+                </Dialog>
                 <div className='flex flex-col gap-2 w-full sm:w-auto'>
                     <Button onClick={copyPollUrl} className="w-full">
                         <LinkIcon className="mr-2 h-4 w-4" />
