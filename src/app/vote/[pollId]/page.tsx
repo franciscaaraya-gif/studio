@@ -217,11 +217,16 @@ function VotePageClient() {
                                         <FormItem>
                                             {poll.pollType === 'simple' ? (
                                                 <FormControl>
-                                                    <RadioGroup onValueChange={field.onChange} defaultValue={field.value} className="space-y-2">
+                                                    <RadioGroup onValueChange={field.onChange} defaultValue={
+                                                                        typeof field.value === "string"
+                                                                            ? field.value
+                                                                            : field.value?.[0]
+                                                                        } className="space-y-2">
                                                         {poll.options.map((option) => (
                                                             <FormItem key={option.id} className="flex items-center space-x-3 space-y-0 rounded-md border p-4 hover:bg-accent hover:text-accent-foreground has-[[data-state=checked]]:bg-primary has-[[data-state=checked]]:text-primary-foreground">
                                                                 <FormControl>
-                                                                    <RadioGroupItem value={option.id} />
+                                                                    <RadioGroupItem value={String(option.id)} />
+
                                                                 </FormControl>
                                                                 <FormLabel className="font-normal flex-1 cursor-pointer">{option.text}</FormLabel>
                                                             </FormItem>
@@ -236,20 +241,31 @@ function VotePageClient() {
                                                             control={form.control}
                                                             name="selectedOptions"
                                                             render={({ field }) => (
-                                                                <FormItem key={option.id} className="flex flex-row items-center space-x-3 space-y-0 rounded-md border p-4 hover:bg-accent hover:text-accent-foreground has-[[data-state=checked]]:bg-primary has-[[data-state=checked]]:text-primary-foreground">
-                                                                    <FormControl>
-                                                                        <Checkbox
-                                                                            checked={field.value?.includes(option.id)}
-                                                                            onCheckedChange={(checked) => {
-                                                                                const currentValue = field.value || [];
-                                                                                return checked
-                                                                                    ? field.onChange([...currentValue, option.id])
-                                                                                    : field.onChange(currentValue.filter(value => value !== option.id));
-                                                                            }}
-                                                                        />
-                                                                    </FormControl>
-                                                                    <FormLabel className="font-normal flex-1 cursor-pointer">{option.text}</FormLabel>
-                                                                </FormItem>
+<FormItem
+  key={option.id}
+  className="flex flex-row items-center space-x-3 space-y-0 rounded-md border p-4 hover:bg-accent hover:text-accent-foreground has-[[data-state=checked]]:bg-primary has-[[data-state=checked]]:text-primary-foreground"
+>
+  <FormControl>
+    <Checkbox
+      checked={field.value?.includes(String(option.id))}
+      onCheckedChange={(checked) => {
+        const currentValue = (field.value ?? []) as string[];
+
+        if (checked) {
+          field.onChange([...currentValue, String(option.id)]);
+        } else {
+          field.onChange(
+            currentValue.filter((value) => value !== String(option.id))
+          );
+        }
+      }}
+    />
+  </FormControl>
+  <FormLabel className="flex-1 cursor-pointer">
+    {option.text}
+  </FormLabel>
+</FormItem>
+
                                                             )}
                                                         />
                                                     ))}
