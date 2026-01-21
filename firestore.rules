@@ -219,7 +219,7 @@ service cloud.firestore {
         allow list: if true;
         allow create: if isSignedIn() && request.resource.data.adminId == request.auth.uid;
         allow update: if false;
-        allow delete: if false;
+        allow delete: if isOwner(resource.data.adminId);
     }
   }
 }

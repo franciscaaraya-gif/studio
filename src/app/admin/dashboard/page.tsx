@@ -1,20 +1,34 @@
 'use client';
 
-import { collection, query, orderBy } from 'firebase/firestore';
+import { collection, query, orderBy, doc, writeBatch } from 'firebase/firestore';
 import Link from 'next/link';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { MoreHorizontal, Users } from 'lucide-react';
+import { useState } from 'react';
 
 import { useFirestore, useCollection, useUserHook, useMemoFirebase } from '@/firebase';
 import { Poll, VoterGroup } from '@/lib/types';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
+import { Button, buttonVariants } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Skeleton } from '@/components/ui/skeleton';
 import { CreatePollDialog } from '@/components/admin/CreatePollDialog';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { useToast } from '@/hooks/use-toast';
+import { errorEmitter } from '@/firebase/error-emitter';
+import { FirestorePermissionError } from '@/firebase/errors';
 
 
 const statusVariant: { [key: string]: 'default' | 'secondary' } = {
@@ -51,6 +65,9 @@ function PollCard({ poll }: { poll: Poll }) {
 function PollsList() {
   const firestore = useFirestore();
   const { user } = useUserHook();
+  const { toast } = useToast();
+  const [isAlertOpen, setIsAlertOpen] = useState(false);
+  const [pollToDelete, setPollToDelete] = useState<Poll | null>(null);
 
   const pollsQuery = useMemoFirebase(() => {
     if (!firestore || !user) return null;
@@ -64,6 +81,44 @@ function PollsList() {
 
   const { data: polls, isLoading: pollsLoading } = useCollection<Poll>(pollsQuery);
   const { data: groups, isLoading: groupsLoading } = useCollection<VoterGroup>(groupsQuery);
+
+  const handleDeleteClick = (poll: Poll) => {
+    setPollToDelete(poll);
+    setIsAlertOpen(true);
+  };
+
+  const handleDeleteConfirm = async () => {
+    if (!pollToDelete || !firestore || !user) return;
+
+    const pollRef = doc(firestore, 'admins', user.uid, 'polls', pollToDelete.id);
+    const lookupRef = doc(firestore, 'poll-lookup', pollToDelete.id);
+
+    try {
+        const batch = writeBatch(firestore);
+        batch.delete(pollRef);
+        batch.delete(lookupRef);
+        await batch.commit();
+
+        toast({
+            title: "Encuesta Eliminada",
+            description: `La encuesta "${pollToDelete.question}" ha sido eliminada.`,
+        });
+    } catch(error: any) {
+        const permissionError = new FirestorePermissionError({
+            path: pollRef.path,
+            operation: 'delete',
+        });
+        errorEmitter.emit('permission-error', permissionError);
+        toast({
+             variant: "destructive",
+             title: "Error al eliminar",
+             description: "No se pudo eliminar la encuesta. Es posible que no tengas permisos."
+        })
+    } finally {
+        setIsAlertOpen(false);
+        setPollToDelete(null);
+    }
+  };
 
 
   if (pollsLoading || groupsLoading) {
@@ -153,7 +208,12 @@ function PollsList() {
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end">
                       <DropdownMenuItem asChild><Link href={`/admin/polls/${poll.id}`}>Ver detalles</Link></DropdownMenuItem>
-                      <DropdownMenuItem className="text-destructive" disabled>Eliminar</DropdownMenuItem>
+                      <DropdownMenuItem
+                        className="text-destructive"
+                        onClick={() => handleDeleteClick(poll)}
+                      >
+                        Eliminar
+                      </DropdownMenuItem>
                     </DropdownMenuContent>
                   </DropdownMenu>
                 </TableCell>
@@ -162,6 +222,24 @@ function PollsList() {
           </TableBody>
         </Table>
       </div>
+      <AlertDialog open={isAlertOpen} onOpenChange={setIsAlertOpen}>
+        <AlertDialogContent>
+            <AlertDialogHeader>
+                <AlertDialogTitle>¿Estás realmente seguro?</AlertDialogTitle>
+                <AlertDialogDescription>
+                    Esta acción no se puede deshacer. Se eliminará permanentemente la encuesta
+                    <span className="font-semibold"> {pollToDelete?.question}</span> y todos sus datos asociados.
+                    Los votos no podrán ser recuperados.
+                </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+                <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                <AlertDialogAction onClick={handleDeleteConfirm} className={buttonVariants({ variant: "destructive" })}>
+                    Eliminar Permanentemente
+                </AlertDialogAction>
+            </AlertDialogFooter>
+        </AlertDialogContent>
+    </AlertDialog>
     </>
   );
 }
