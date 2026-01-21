@@ -1,7 +1,7 @@
 'use client';
 
 import { useParams } from 'next/navigation';
-import { useUser, useDoc, useCollection, useFirestore, useMemoFirebase } from '@/firebase';
+import { useUserHook, useDoc, useCollection, useFirestore, useMemoFirebase } from '@/firebase';
 import { doc, collection, updateDoc, getDoc } from 'firebase/firestore';
 import { Poll, VoterGroup, VoterInfo, VoterStatus } from '@/lib/types';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
