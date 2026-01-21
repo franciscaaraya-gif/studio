@@ -42,7 +42,7 @@ export interface FirebaseServicesAndUser {
   userError: Error | null;
 }
 
-// Return type for useUser() - specific to user auth state
+// Return type for useUserHook() - specific to user auth state
 export interface UserHookResult { 
   user: User | null;
   isUserLoading: boolean;

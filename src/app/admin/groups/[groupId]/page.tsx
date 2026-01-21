@@ -2,7 +2,7 @@
 
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { useUser, useDoc, useFirestore, useMemoFirebase } from '@/firebase';
+import { useUserHook, useDoc, useFirestore, useMemoFirebase } from '@/firebase';
 import { doc } from 'firebase/firestore';
 import { VoterGroup } from '@/lib/types';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -12,7 +12,7 @@ import GroupDetailsLoading from './loading';
 
 export default function GroupDetailsPage() {
   const { groupId } = useParams() as { groupId: string };
-  const { user, isUserLoading } = useUser();
+  const { user, isUserLoading } = useUserHook();
   const firestore = useFirestore();
   const router = useRouter();
 
