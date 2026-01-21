@@ -1,12 +1,16 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, ReactNode } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import Link from 'next/link';
 import { useUserHook } from "@/firebase/auth/useUserHook";
-import { SidebarProvider, SidebarInset, SidebarTrigger } from "@/components/ui/sidebar";
+import { SidebarProvider, SidebarInset, SidebarTrigger, Sidebar, SidebarContent, SidebarFooter, SidebarHeader, SidebarMenu } from "@/components/ui/sidebar";
 import { AdminSidebar } from "@/components/layout/AdminSidebar";
 import { ElectorIcon } from "@/components/icons";
+import { SidebarMenuSkeleton } from "@/components/ui/sidebar";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Card, CardContent, CardHeader } from "@/components/ui/card";
+
 
 export default function AdminLayout({
   children,
@@ -33,21 +37,69 @@ export default function AdminLayout({
     }
   }, [user, loading, pathname, router]);
 
+  const skeletonLayout = (content: ReactNode) => (
+    <SidebarProvider>
+        <Sidebar>
+            <SidebarHeader>
+                <div className="flex items-center gap-2">
+                    <Link href="/admin/dashboard" className="flex items-center gap-2 font-semibold text-lg pointer-events-none">
+                        <ElectorIcon className="w-8 h-8 text-primary" />
+                        <span className="font-headline group-data-[collapsible=icon]:hidden">
+                            <Skeleton className="h-6 w-24" />
+                        </span>
+                    </Link>
+                </div>
+            </SidebarHeader>
+            <SidebarContent>
+                <SidebarMenu>
+                    <SidebarMenuSkeleton showIcon />
+                    <SidebarMenuSkeleton showIcon />
+                    <SidebarMenuSkeleton showIcon />
+                </SidebarMenu>
+            </SidebarContent>
+            <SidebarFooter>
+                <SidebarMenu>
+                    <SidebarMenuSkeleton showIcon />
+                </SidebarMenu>
+            </SidebarFooter>
+        </Sidebar>
+        <SidebarInset>
+            <header className="sticky top-0 z-10 flex h-14 items-center justify-between gap-4 border-b bg-background px-4 sm:h-16 sm:px-6 md:hidden">
+                <Skeleton className="h-7 w-7" />
+                <Skeleton className="h-6 w-24" />
+                <div className="w-7" />
+            </header>
+            <main className="flex-1 p-4 sm:p-6">
+                {content}
+            </main>
+        </SidebarInset>
+    </SidebarProvider>
+  );
+
   if (loading) {
-    return (
-        <div className="flex h-dvh items-center justify-center">
-            <p>Cargando...</p>
-        </div>
-    );
+    // Show a skeleton layout while authenticating.
+    // Next.js will pass the route's loading.tsx as children here.
+    return skeletonLayout(children);
   }
 
-  // This logic prevents a flash of the login page for authenticated users,
-  // or a flash of a protected page for unauthenticated users.
+  // This logic prevents a flash of content before redirection.
   if ((!user && pathname !== "/admin/login") || (user && pathname === "/admin/login")) {
-    return (
-        <div className="flex h-dvh items-center justify-center">
-            <p>Cargando...</p>
-        </div>
+    // Show the layout skeleton with a generic content skeleton inside.
+    return skeletonLayout(
+        <div className="space-y-6">
+           <CardHeader className="p-0">
+               <Skeleton className="h-9 w-64" />
+               <Skeleton className="h-5 w-80 mt-2" />
+           </CardHeader>
+           <Card>
+               <CardHeader>
+                 <Skeleton className="h-10 w-full" />
+               </CardHeader>
+               <CardContent>
+                 <Skeleton className="h-40 w-full" />
+               </CardContent>
+           </Card>
+         </div>
     );
   }
 
