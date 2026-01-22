@@ -119,7 +119,7 @@ export function AdminLoginForm() {
         toast({
           variant: 'destructive',
           title: 'Acceso Denegado',
-          description: `El correo "${user.email}" no está autorizado. Asegúrate de que el correo en Firestore esté guardado en minúsculas.`
+          description: `El correo "${user.email}" no está autorizado. Asegúrate de que el correo en Firestore esté guardado completamente en minúsculas.`
         });
       } else {
           // User is authorized. Now, ensure their admin document exists.
@@ -136,17 +136,28 @@ export function AdminLoginForm() {
           // The onAuthStateChanged in AdminLayout will handle the redirect.
       }
     } catch (error: any) {
-      let description = 'Ocurrió un error inesperado al intentar iniciar sesión con Microsoft.';
-      if (error.code === 'auth/popup-closed-by-user') {
-        description = 'Has cerrado la ventana de inicio de sesión. Por favor, inténtalo de nuevo.';
-      } else if (error.code === 'auth/account-exists-with-different-credential') {
-        description = 'Ya existe una cuenta con este correo electrónico pero con un método de inicio de sesión diferente.';
-      }
-      toast({
-        variant: 'destructive',
-        title: 'Error de autenticación',
-        description,
-      });
+        let title = 'Error de autenticación';
+        let description = 'Ocurrió un error inesperado al intentar iniciar sesión con Microsoft.';
+        
+        // Handle Firestore "missing index" error
+        if (error.code === 'failed-precondition' && error.message.includes('query requires an index')) {
+            title = 'Configuración de Base de Datos Requerida';
+            description = 'La consulta de autorización falló porque falta un índice en la base de datos. Revisa la consola del navegador (F12) para encontrar un enlace para crearlo.';
+        } 
+        // Handle existing auth errors
+        else if (error.code === 'auth/popup-closed-by-user') {
+            description = 'Has cerrado la ventana de inicio de sesión. Por favor, inténtalo de nuevo.';
+        } else if (error.code === 'auth/account-exists-with-different-credential') {
+            description = 'Ya existe una cuenta con este correo electrónico pero con un método de inicio de sesión diferente.';
+        }
+
+        console.error("Microsoft Sign-In Error:", error);
+
+        toast({
+            variant: 'destructive',
+            title: title,
+            description,
+        });
     } finally {
       setIsMicrosoftLoading(false);
     }
