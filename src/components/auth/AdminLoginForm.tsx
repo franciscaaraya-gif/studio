@@ -117,7 +117,7 @@ export function AdminLoginForm() {
         toast({
           variant: 'destructive',
           title: 'Acceso Denegado',
-          description: 'Tu cuenta de Microsoft no está autorizada para administrar esta plataforma.'
+          description: `El correo "${user.email}" no está autorizado para administrar esta plataforma.`
         });
       } else {
           // User is authorized. Now, ensure their admin document exists.
