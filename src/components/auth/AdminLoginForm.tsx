@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { signInWithEmailAndPassword, signInWithPopup, OAuthProvider, signOut } from 'firebase/auth';
+import { signInWithEmailAndPassword, signInWithPopup, OAuthProvider, signOut, setPersistence, browserSessionPersistence } from 'firebase/auth';
 import { doc, getDoc } from 'firebase/firestore'; 
 import { useAuth, useFirestore } from '@/firebase';
 import { useToast } from '@/hooks/use-toast';
@@ -60,6 +60,7 @@ export function AdminLoginForm() {
     
     setIsLoading(true);
     try {
+      await setPersistence(auth, browserSessionPersistence);
       await signInWithEmailAndPassword(auth, values.email, values.password);
       // The AdminLayout component will handle the redirection to the dashboard
       // after the auth state changes.
@@ -90,6 +91,7 @@ export function AdminLoginForm() {
 
     setIsMicrosoftLoading(true);
     try {
+      await setPersistence(auth, browserSessionPersistence);
       const provider = new OAuthProvider('microsoft.com');
       const result = await signInWithPopup(auth, provider);
       const user = result.user;
