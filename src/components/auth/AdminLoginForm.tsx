@@ -106,9 +106,11 @@ export function AdminLoginForm() {
           setIsMicrosoftLoading(false);
           return;
       }
+      
+      const userEmail = user.email.toLowerCase();
 
       // Check if the user's email is in the authorized list
-      const authQuery = query(collection(firestore, "authorizedAdmins"), where("email", "==", user.email));
+      const authQuery = query(collection(firestore, "authorizedAdmins"), where("email", "==", userEmail));
       const authQuerySnapshot = await getDocs(authQuery);
 
       if (authQuerySnapshot.empty) {
@@ -117,7 +119,7 @@ export function AdminLoginForm() {
         toast({
           variant: 'destructive',
           title: 'Acceso Denegado',
-          description: `El correo "${user.email}" no está autorizado para administrar esta plataforma.`
+          description: `El correo "${user.email}" no está autorizado. Asegúrate de que el correo en Firestore esté guardado en minúsculas.`
         });
       } else {
           // User is authorized. Now, ensure their admin document exists.
