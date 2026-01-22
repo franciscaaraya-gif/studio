@@ -151,8 +151,6 @@ export function CreatePollDialog() {
         resetDialog();
 
     } catch (error: any) {
-        console.error("Error creating poll:", error);
-        
         if (error.code && error.code.startsWith('permission-denied')) {
             const permissionError = new FirestorePermissionError({
                 path: `admins/${user.uid}/polls`,

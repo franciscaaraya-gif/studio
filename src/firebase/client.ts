@@ -18,9 +18,6 @@ const app =
     ? initializeApp(firebaseConfig)
     : getApp();
 
-    console.log("🔥 Firebase config:", firebaseConfig);
-    console.log("🔥 Firebase projectId:", firebaseConfig.projectId);
-    
 
 export const firebaseApp = app;
 export const auth = getAuth(app);

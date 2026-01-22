@@ -151,8 +151,6 @@ export function AdminLoginForm() {
             description = 'Ya existe una cuenta con este correo electrónico pero con un método de inicio de sesión diferente.';
         }
 
-        console.error("Microsoft Sign-In Error:", error);
-
         toast({
             variant: 'destructive',
             title: title,

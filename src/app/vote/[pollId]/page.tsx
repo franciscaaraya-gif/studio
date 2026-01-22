@@ -110,7 +110,6 @@ function VotePageClient() {
         if (!auth || isAuthLoading || user) return;
 
         signInAnonymously(auth).catch(err => {
-            console.error("Anonymous sign-in failed", err);
             setError("Se requiere autenticación para votar.");
         });
     }, [auth, user, isAuthLoading]);
