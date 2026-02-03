@@ -18,7 +18,7 @@ export default function Home() {
         <nav className="ml-auto flex gap-4 sm:gap-6">
           <Button variant="ghost" asChild>
             <Link
-              href="/login"
+              href="/inbox"
               prefetch={false}
             >
               Acceder a Encuesta
@@ -59,7 +59,7 @@ export default function Home() {
                 </div>
                 <div className="flex flex-col gap-4 min-[400px]:flex-row">
                   <Button asChild size="lg" className="bg-primary hover:bg-primary/90 text-primary-foreground">
-                    <Link href="/login">
+                    <Link href="/inbox">
                       <LogIn className="mr-2 h-5 w-5" />
                       Ir a Votar
                     </Link>

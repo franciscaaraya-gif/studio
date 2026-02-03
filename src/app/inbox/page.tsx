@@ -11,44 +11,32 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
-import { useToast } from '@/hooks/use-toast';
 
 const formSchema = z.object({
-  pollId: z.string().min(1, { message: 'El ID de la encuesta es requerido.' }),
+  voterId: z.string().min(1, { message: 'Tu ID de votante es requerido.' }),
 });
 
-export function UserLoginForm() {
+export default function VoterInboxLoginPage() {
   const router = useRouter();
-  const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(false);
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
-    defaultValues: { pollId: '' },
+    defaultValues: { voterId: '' },
   });
 
   async function onSubmit(values: z.infer<typeof formSchema>) {
     setIsLoading(true);
-    const pollId = values.pollId.trim();
-    
-    if (pollId) {
-      router.push(`/vote/${pollId}`);
-    } else {
-      toast({
-        variant: 'destructive',
-        title: 'Datos Incompletos',
-        description: 'Por favor, ingresa el ID de la encuesta.',
-      });
-      setIsLoading(false);
-    }
+    const voterId = values.voterId.trim();
+    router.push(`/inbox/polls?voterId=${voterId}`);
   }
 
   return (
     <Card className="shadow-lg">
       <CardHeader>
-        <CardTitle className="text-2xl font-headline">Participar en Encuesta</CardTitle>
+        <CardTitle className="text-2xl font-headline">Bandeja de Votación</CardTitle>
         <CardDescription>
-            Paso 1: Ingresa el ID de la encuesta que te proporcionaron para continuar.
+            Ingresa tu ID de votante para ver las encuestas en las que puedes participar.
         </CardDescription>
       </CardHeader>
       <CardContent>
@@ -56,12 +44,12 @@ export function UserLoginForm() {
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
             <FormField
               control={form.control}
-              name="pollId"
+              name="voterId"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>ID de la Encuesta</FormLabel>
+                  <FormLabel>ID de Votante</FormLabel>
                   <FormControl>
-                    <Input placeholder="Pega el ID de la encuesta aquí" {...field} disabled={isLoading} />
+                    <Input placeholder="Pega tu ID de votante aquí" {...field} disabled={isLoading} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -69,7 +57,7 @@ export function UserLoginForm() {
             />
             <Button type="submit" className="w-full mt-4" disabled={isLoading}>
               {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              Siguiente
+              Ver mis encuestas
             </Button>
           </form>
         </Form>

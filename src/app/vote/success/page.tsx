@@ -24,7 +24,7 @@ export default function VoteSuccessPage() {
                     <p className="text-muted-foreground">Tu voto anónimo ha sido registrado de forma segura.</p>
                     <div className="flex flex-col sm:flex-row gap-4 w-full">
                         <Button asChild variant="outline" className="w-full">
-                            <Link href="/login">Votar en otra encuesta</Link>
+                            <Link href="/inbox">Volver a la bandeja de entrada</Link>
                         </Button>
                         <Button asChild className="w-full">
                             <Link href="/">Volver al Inicio</Link>

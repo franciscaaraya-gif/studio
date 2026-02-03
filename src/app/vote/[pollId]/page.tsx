@@ -23,77 +23,13 @@ import { Label } from '@/components/ui/label';
 import { Form, FormControl, FormField, FormItem, FormMessage, FormLabel } from '@/components/ui/form';
 import { useToast } from '@/hooks/use-toast';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { Input } from '@/components/ui/input';
-
-// Componente para solicitar el ID de votante cuando no está en la URL
-function VoterIdForm({ pollId }: { pollId: string }) {
-  const router = useRouter();
-  const [isLoading, setIsLoading] = useState(false);
-
-  const formSchema = z.object({
-    voterId: z.string().min(1, { message: 'Tu ID de votante es requerido.' }),
-  });
-
-  const form = useForm<z.infer<typeof formSchema>>({
-    resolver: zodResolver(formSchema),
-    defaultValues: { voterId: '' },
-  });
-
-  function onSubmit(values: z.infer<typeof formSchema>) {
-    setIsLoading(true);
-    router.push(`/vote/${pollId}?voterId=${values.voterId.trim()}`);
-  }
-
-  return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Paso 2: Identifícate</CardTitle>
-        <CardDescription>
-          Para continuar, ingresa tu ID de votante personal.
-        </CardDescription>
-      </CardHeader>
-      <Form {...form}>
-        <form onSubmit={form.handleSubmit(onSubmit)}>
-          <CardContent>
-            <FormField
-              control={form.control}
-              name="voterId"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Tu ID de Votante</FormLabel>
-                  <FormControl>
-                    <Input placeholder="Pega tu ID de votante aquí" {...field} disabled={isLoading} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-          </CardContent>
-          <CardFooter className="flex-col gap-4">
-            <Button type="submit" disabled={isLoading} className="w-full">
-              {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              Acceder a la Votación
-            </Button>
-            <Button asChild variant="outline" className='w-full'>
-              <Link href="/login">
-                <ArrowLeft className="mr-2 h-4 w-4" />
-                Ingresar otro ID de encuesta
-              </Link>
-            </Button>
-          </CardFooter>
-        </form>
-      </Form>
-    </Card>
-  );
-}
-
 
 function VotePageClient() {
     const { pollId } = useParams() as { pollId: string };
     const searchParams = useSearchParams();
-    const voterId = searchParams.get('voterId');
     const router = useRouter();
     const { toast } = useToast();
+    const voterId = searchParams.get('voterId');
 
     const [poll, setPoll] = useState<Poll | null>(null);
     const [voterDocId, setVoterDocId] = useState<string | null>(null);
@@ -116,18 +52,14 @@ function VotePageClient() {
 
     // Data fetching effect
     useEffect(() => {
-        // If there's no voterId, we don't fetch. The form will be displayed.
         if (!voterId) {
+            // This case is handled by the initial check, but as a safeguard:
+            setError("Falta el ID de votante.");
             setIsFetchingData(false);
             return;
         }
 
         if (!firestore || !pollId || isAuthLoading || !user) {
-            if (!isAuthLoading && !isFetchingData) {
-                 if (!pollId) {
-                    setError("Falta el ID de la encuesta en la URL.");
-                }
-            }
             return;
         }
 
@@ -231,9 +163,32 @@ function VotePageClient() {
         </div>
     );
     
-    // Step 1: Handle missing voterId by showing the form
+    // Step 1: Handle missing voterId
     if (!voterId) {
-        return pageLayout(<VoterIdForm pollId={pollId} />);
+        return pageLayout(
+             <Card>
+                <CardHeader>
+                    <CardTitle>Falta el ID de votante</CardTitle>
+                </CardHeader>
+                <CardContent>
+                    <Alert variant="destructive">
+                        <AlertCircle className="h-4 w-4" />
+                        <AlertTitle>Parámetro no encontrado</AlertTitle>
+                        <AlertDescription>
+                            Para votar, tu ID de votante debe estar incluido en el enlace. Por favor, accede a través de tu bandeja de entrada.
+                        </AlertDescription>
+                    </Alert>
+                </CardContent>
+                <CardFooter>
+                   <Button asChild variant="outline" className='w-full'>
+                        <Link href="/inbox">
+                            <ArrowLeft className="mr-2 h-4 w-4" />
+                            Ir a la Bandeja de Entrada
+                        </Link>
+                    </Button>
+                </CardFooter>
+            </Card>
+        );
     }
 
     // Step 2: Handle loading state while fetching data
@@ -260,9 +215,9 @@ function VotePageClient() {
                 </CardContent>
                 <CardFooter>
                    <Button asChild variant="outline" className='w-full'>
-                        <Link href={`/vote/${pollId}`}>
+                        <Link href="/inbox">
                             <ArrowLeft className="mr-2 h-4 w-4" />
-                            Intentar con otro ID de votante
+                            Volver a la bandeja de entrada
                         </Link>
                     </Button>
                 </CardFooter>
