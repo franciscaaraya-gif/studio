@@ -1,10 +1,19 @@
+'use client';
+
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { CheckCircle2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { ElectorIcon } from "@/components/icons";
 
 export default function VoteSuccessPage() {
+  const searchParams = useSearchParams();
+  const voterId = searchParams.get('voterId');
+  const salaId = searchParams.get('salaId');
+
+  const inboxHref = (voterId && salaId) ? `/inbox/polls?salaId=${salaId}&voterId=${voterId}` : '/inbox';
+
   return (
     <div className="flex min-h-dvh flex-col items-center justify-center bg-background p-4">
         <div className="w-full max-w-md text-center">
@@ -24,7 +33,7 @@ export default function VoteSuccessPage() {
                     <p className="text-muted-foreground">Tu voto anónimo ha sido registrado de forma segura.</p>
                     <div className="flex flex-col sm:flex-row gap-4 w-full">
                         <Button asChild variant="outline" className="w-full">
-                            <Link href="/inbox">Volver a la bandeja de entrada</Link>
+                            <Link href={inboxHref}>Volver a la bandeja de entrada</Link>
                         </Button>
                         <Button asChild className="w-full">
                             <Link href="/">Volver al Inicio</Link>

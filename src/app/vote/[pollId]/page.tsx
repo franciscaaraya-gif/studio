@@ -138,7 +138,7 @@ function VotePageClient() {
             
             await batch.commit();
 
-            router.push('/vote/success');
+            router.push(`/vote/success?voterId=${voterId}&salaId=${adminId}`);
 
         } catch (err: any) {
             toast({ variant: 'destructive', title: 'Error al emitir el voto', description: err.message });
