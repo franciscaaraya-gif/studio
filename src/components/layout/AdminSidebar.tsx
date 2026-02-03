@@ -1,10 +1,10 @@
-"use client";
+'use client';
 
-import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
-import { BarChart2, ListChecks, LogOut, Settings, Users, UserCircle } from "lucide-react";
-import { useAuth, useUser } from "@/firebase";
-import { signOut } from "firebase/auth";
+import Link from 'next/link';
+import { usePathname, useRouter } from 'next/navigation';
+import { BarChart2, ListChecks, LogOut, Settings, Users, UserCircle } from 'lucide-react';
+import { useAuth, useUser } from '@/firebase';
+import { signOut } from 'firebase/auth';
 
 import {
   Sidebar,
@@ -15,8 +15,8 @@ import {
   SidebarMenuItem,
   SidebarMenuButton,
   SidebarSeparator,
-} from "@/components/ui/sidebar";
-import { ElectorIcon } from "@/components/icons";
+} from '@/components/ui/sidebar';
+import { ElectorIcon } from '@/components/icons';
 
 export function AdminSidebar() {
   const pathname = usePathname();
@@ -35,10 +35,10 @@ export function AdminSidebar() {
     <Sidebar>
       <SidebarHeader>
         <div className="flex items-center gap-2">
-            <Link href="/admin/dashboard" className="flex items-center gap-2 font-semibold text-lg">
-                <ElectorIcon className="w-8 h-8 text-primary" />
-                <span className="group-data-[collapsible=icon]:hidden font-headline">E-lector</span>
-            </Link>
+          <Link href="/admin/dashboard" className="flex items-center gap-2 font-semibold text-lg">
+            <ElectorIcon className="w-8 h-8 text-primary" />
+            <span className="group-data-[collapsible=icon]:hidden font-headline">E-lector</span>
+          </Link>
         </div>
       </SidebarHeader>
       <SidebarContent>
@@ -46,7 +46,7 @@ export function AdminSidebar() {
           <SidebarMenuItem>
             <SidebarMenuButton
               asChild
-              isActive={pathname.startsWith("/admin/dashboard") || pathname.startsWith("/admin/polls")}
+              isActive={pathname.startsWith('/admin/dashboard') || pathname.startsWith('/admin/polls')}
               tooltip="Encuestas"
             >
               <Link href="/admin/dashboard">
@@ -58,7 +58,7 @@ export function AdminSidebar() {
           <SidebarMenuItem>
             <SidebarMenuButton
               asChild
-              isActive={pathname.startsWith("/admin/groups")}
+              isActive={pathname.startsWith('/admin/groups')}
               tooltip="Grupos"
             >
               <Link href="/admin/groups">
@@ -68,10 +68,7 @@ export function AdminSidebar() {
             </SidebarMenuButton>
           </SidebarMenuItem>
           <SidebarMenuItem>
-            <SidebarMenuButton
-              asChild
-              tooltip="App de Listas"
-            >
+            <SidebarMenuButton asChild tooltip="App de Listas">
               <Link href="https://studio-2564557381-68586.web.app/" target="_blank" rel="noopener noreferrer">
                 <ListChecks />
                 <span>App de Listas</span>
@@ -81,7 +78,7 @@ export function AdminSidebar() {
           <SidebarMenuItem>
             <SidebarMenuButton
               asChild
-              isActive={pathname === "/admin/settings"}
+              isActive={pathname === '/admin/settings'}
               tooltip="Configuración"
               // @ts-ignore
               disabled
@@ -96,22 +93,24 @@ export function AdminSidebar() {
       </SidebarContent>
       <SidebarFooter>
         {user && (
-            <div className="flex flex-col gap-2 p-2 text-sm text-muted-foreground group-data-[collapsible=icon]:hidden">
-                <SidebarSeparator />
-                <div className="flex items-center gap-2 p-2">
-                    <UserCircle className="h-5 w-5 shrink-0" />
-                    <span className="truncate" title={user.email || ''}>{user.email}</span>
-                </div>
+          <div className="flex flex-col gap-2 p-2 text-sm text-muted-foreground group-data-[collapsible=icon]:hidden">
+            <SidebarSeparator />
+            <div className="flex items-center gap-2 p-2">
+              <UserCircle className="h-5 w-5 shrink-0" />
+              <span className="truncate" title={user.email || ''}>
+                {user.email}
+              </span>
             </div>
+          </div>
         )}
-         <SidebarMenu>
-            <SidebarMenuItem>
-                <SidebarMenuButton onClick={handleLogout} tooltip="Cerrar Sesión">
-                  <LogOut />
-                  <span>Cerrar Sesión</span>
-                </SidebarMenuButton>
-            </SidebarMenuItem>
-         </SidebarMenu>
+        <SidebarMenu>
+          <SidebarMenuItem>
+            <SidebarMenuButton onClick={handleLogout} tooltip="Cerrar Sesión">
+              <LogOut />
+              <span>Cerrar Sesión</span>
+            </SidebarMenuButton>
+          </SidebarMenuItem>
+        </SidebarMenu>
       </SidebarFooter>
     </Sidebar>
   );

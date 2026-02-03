@@ -162,26 +162,32 @@ export function CreateGroupDialog() {
   
   const handleImportFromApp = () => {
     // --- PUNTO DE INTEGRACIÓN ---
-    // Aquí es donde conectarías con la API de tu "App de Listas".
-    // Deberías reemplazar los datos de ejemplo con una llamada `fetch` a tu API.
+    // Esta función se activa al presionar el botón "Conectar y Seleccionar Lista".
+    // La URL que proporcionaste no es un endpoint de API REST, sino un canal interno de Firestore.
+    // Para que esto funcione, necesitas un endpoint que devuelva una lista de votantes en formato JSON.
+    // Usualmente, esto se logra con una Cloud Function en tu otro proyecto de Firebase.
     
     /*
-    // EJEMPLO DE CÓMO PODRÍA SER LA LLAMADA A TU API:
+    // --- EJEMPLO DE CÓMO LLAMAR A TU API (CUANDO LA TENGAS) ---
     const fetchVotersFromApi = async () => {
         try {
-            // Reemplaza esta URL con el endpoint real de tu API
+            // 1. REEMPLAZA ESTA URL:
+            // Esta debe ser la URL de tu Cloud Function o API que devuelve la lista de usuarios.
+            // Ejemplo: 'https://us-central1-TU_PROJECT_ID.cloudfunctions.net/getVotersList'
             const response = await fetch('https://api.tu-app-de-listas.com/voters');
+            
             if (!response.ok) {
-                throw new Error('No se pudo conectar con la API');
+                throw new Error(`Error de red: ${'${response.status}'}`);
             }
             const data = await response.json();
 
-            // Asegúrate de que los datos de la API tengan el formato correcto:
-            // { id: string, nombre: string, apellido: string }
-            const formattedVoters = data.map(voter => ({
-                id: voter.id,
-                nombre: voter.firstName, // ajusta los nombres de los campos
-                apellido: voter.lastName, // ajusta los nombres de los campos
+            // 2. AJUSTA LOS DATOS:
+            // El formato esperado es un array de objetos: { id: string, nombre: string, apellido: string }
+            // Adapta el mapeo según la estructura de datos que tu API devuelva.
+            const formattedVoters = data.map(voterFromApi => ({
+                id: voterFromApi.userId, // ej: voterFromApi.id, voterFromApi.user_id
+                nombre: voterFromApi.firstName, // ej: voterFromApi.name
+                apellido: voterFromApi.lastName, // ej: voterFromApi.surname
                 enabled: true,
             }));
             
@@ -189,7 +195,7 @@ export function CreateGroupDialog() {
             setFileName('Importado desde la API');
             toast({
                 title: '¡Lista importada!',
-                description: `Se han cargado ${'${formattedVoters.length}'} votantes.`,
+                description: `Se han cargado ${'${formattedVoters.length}'} votantes desde tu app.`,
             });
 
         } catch (error) {
@@ -197,18 +203,20 @@ export function CreateGroupDialog() {
             toast({
                 variant: 'destructive',
                 title: 'Error de importación',
-                description: 'No se pudo obtener la lista desde la API.',
+                description: 'No se pudo obtener la lista desde la API. Revisa la consola para más detalles.',
             });
         }
     };
     
-    fetchVotersFromApi();
+    // 3. DESCOMENTA ESTA LÍNEA para activar la llamada a la API:
+    // fetchVotersFromApi();
     */
 
     // --- SIMULACIÓN ACTUAL (REEMPLAZAR CON LA LÓGICA DE ARRIBA) ---
+    // Por ahora, se cargarán datos de ejemplo para que veas cómo funciona la previsualización.
     toast({
         title: 'Simulación de Importación',
-        description: 'En un caso real, esto conectaría a tu app. Se han cargado datos de ejemplo.',
+        description: 'En un caso real, esto conectaría a tu API. Se han cargado datos de ejemplo.',
     });
     const exampleVoters = [
         { id: 'usr_001', apellido: 'García', nombre: 'Ana', enabled: true },
@@ -216,7 +224,7 @@ export function CreateGroupDialog() {
         { id: 'usr_003', apellido: 'López', nombre: 'Elena', enabled: true },
     ];
     setParsedVoters(exampleVoters);
-    setFileName('Importado desde la App de Listas');
+    setFileName('Importado desde App (Ejemplo)');
   };
 
 
