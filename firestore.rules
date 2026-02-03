@@ -247,8 +247,8 @@ service cloud.firestore {
      * @deny (get, create, update, delete) For this simple implementation, sala management is done via the Firebase Console.
      */
     match /salas/{salaId} {
-      allow get: if true;
-      allow list: if true;
+      allow get: if isSignedIn();
+      allow list: if isSignedIn();
       allow create, update, delete: if false;
     }
   }

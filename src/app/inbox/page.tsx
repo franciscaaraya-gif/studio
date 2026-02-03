@@ -4,11 +4,12 @@ import { useRouter } from 'next/navigation';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Loader2 } from 'lucide-react';
 import { collection } from 'firebase/firestore';
+import { signInAnonymously } from 'firebase/auth';
 
-import { useCollection, useFirestore, useMemoFirebase } from '@/firebase';
+import { useCollection, useFirestore, useMemoFirebase, useAuth, useUser } from '@/firebase';
 import { Sala } from '@/lib/types';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -26,11 +27,23 @@ export default function VoterInboxLoginPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   
   const firestore = useFirestore();
+  const auth = useAuth();
+  const { user, isUserLoading: isAuthLoading } = useUser();
+
+  // Anonymous sign-in effect to allow reading the 'salas' collection
+  useEffect(() => {
+    if (!auth || isAuthLoading || user) return;
+    signInAnonymously(auth).catch((err) => {
+      // This is a background process, so we don't need to show a user-facing error.
+      // If permissions fail, the useCollection hook will catch it.
+    });
+  }, [auth, user, isAuthLoading]);
 
   const salasQuery = useMemoFirebase(() => {
-    if (!firestore) return null;
+    // Wait for user to be authenticated to run the query
+    if (!firestore || !user) return null;
     return collection(firestore, 'salas');
-  }, [firestore]);
+  }, [firestore, user]);
   
   const { data: salas, isLoading: salasLoading } = useCollection<Sala>(salasQuery);
 
@@ -41,13 +54,13 @@ export default function VoterInboxLoginPage() {
 
   async function onSubmit(values: z.infer<typeof formSchema>) {
     setIsSubmitting(true);
-    const salaId = values.salaAdminId;
+    const salaAdminId = values.salaAdminId;
     const voterId = values.voterId.trim();
     // The query param is still called `salaId` but it contains the admin UID
-    router.push(`/inbox/polls?salaId=${salaId}&voterId=${voterId}`);
+    router.push(`/inbox/polls?salaId=${salaAdminId}&voterId=${voterId}`);
   }
 
-  const isLoading = salasLoading || isSubmitting;
+  const isLoading = salasLoading || isAuthLoading || isSubmitting;
 
   return (
     <Card className="shadow-lg">
@@ -69,11 +82,11 @@ export default function VoterInboxLoginPage() {
                    <Select onValueChange={field.onChange} defaultValue={field.value} disabled={isLoading}>
                     <FormControl>
                       <SelectTrigger>
-                        <SelectValue placeholder={salasLoading ? "Cargando salas..." : "Selecciona una sala"} />
+                        <SelectValue placeholder={isLoading ? "Cargando salas..." : "Selecciona una sala"} />
                       </SelectTrigger>
                     </FormControl>
                     <SelectContent>
-                      {!salasLoading && salas?.length === 0 && (
+                      {!isLoading && salas?.length === 0 && (
                         <p className="p-4 text-sm text-muted-foreground">No hay salas disponibles. Contacta al administrador.</p>
                       )}
                       {salas?.map(sala => (

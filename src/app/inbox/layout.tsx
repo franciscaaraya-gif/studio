@@ -1,5 +1,7 @@
 import Link from 'next/link';
 import { ElectorIcon } from '@/components/icons';
+import { Button } from '@/components/ui/button';
+import { ArrowLeft } from 'lucide-react';
 
 export default function InboxLayout({
   children,
@@ -16,6 +18,14 @@ export default function InboxLayout({
             </Link>
         </div>
         {children}
+        <div className="mt-4 text-center">
+            <Button variant="link" asChild>
+                <Link href="/">
+                    <ArrowLeft className="mr-2 h-4 w-4" />
+                    Volver al Inicio
+                </Link>
+            </Button>
+        </div>
       </div>
     </div>
   );
