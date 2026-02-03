@@ -6,7 +6,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import * as XLSX from 'xlsx';
 import { addDoc, collection, serverTimestamp } from 'firebase/firestore';
-import { FileUp, Loader2, PlusCircle, Trash2 } from 'lucide-react';
+import { FileUp, Loader2, PlusCircle, Trash2, Import } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import {
@@ -25,9 +25,9 @@ import { useFirestore, useUser } from '@/firebase';
 import { errorEmitter } from '@/firebase/error-emitter';
 import { FirestorePermissionError } from '@/firebase/errors';
 import { cn } from '@/lib/utils';
-import { VoterInfo } from '@/lib/types';
 import { ScrollArea } from '../ui/scroll-area';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../ui/table';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
 const formSchema = z.object({
   name: z.string().min(3, { message: 'El nombre debe tener al menos 3 caracteres.' }).max(50, { message: 'El nombre no puede tener más de 50 caracteres.' }),
@@ -46,6 +46,7 @@ export function CreateGroupDialog() {
   const [isDragging, setIsDragging] = useState(false);
   const [fileName, setFileName] = useState('');
   const [parsedVoters, setParsedVoters] = useState<ParsedVoter[]>([]);
+  const [activeTab, setActiveTab] = useState('upload');
   const { toast } = useToast();
   const firestore = useFirestore();
   const { user } = useUser();
@@ -63,6 +64,7 @@ export function CreateGroupDialog() {
     setIsDragging(false);
     setFileName('');
     setParsedVoters([]);
+    setActiveTab('upload');
   };
 
   const handleFile = (file: File) => {
@@ -157,6 +159,21 @@ export function CreateGroupDialog() {
     const fileInput = document.getElementById('file-upload') as HTMLInputElement;
     if(fileInput) fileInput.value = '';
   }
+  
+  const handleImportFromApp = () => {
+    toast({
+        title: 'Simulación de Importación',
+        description: 'En un caso real, esto conectaría a tu app. Se han cargado datos de ejemplo.',
+    });
+    const exampleVoters = [
+        { id: 'usr_001', apellido: 'García', nombre: 'Ana', enabled: true },
+        { id: 'usr_002', apellido: 'Martínez', nombre: 'Luis', enabled: true },
+        { id: 'usr_003', apellido: 'López', nombre: 'Elena', enabled: true },
+    ];
+    setParsedVoters(exampleVoters);
+    setFileName('Importado desde la App de Listas');
+    // We don't need to switch tabs, the preview is now shared
+  };
 
 
   function onSubmit(values: z.infer<typeof formSchema>) {
@@ -165,7 +182,7 @@ export function CreateGroupDialog() {
       return;
     }
     if(parsedVoters.length === 0){
-        toast({ variant: 'destructive', title: 'No hay votantes', description: 'Por favor, sube un archivo con la lista de votantes.' });
+        toast({ variant: 'destructive', title: 'No hay votantes', description: 'Por favor, sube o importa una lista de votantes.' });
         return;
     }
 
@@ -213,9 +230,9 @@ export function CreateGroupDialog() {
       </DialogTrigger>
       <DialogContent className="sm:max-w-lg">
         <DialogHeader>
-          <DialogTitle>Crear Grupo desde Archivo</DialogTitle>
+          <DialogTitle>Crear Nuevo Grupo</DialogTitle>
           <DialogDescription>
-            Sube un archivo Excel (.xlsx, .csv) con la lista de votantes.
+            Sube un archivo o importa desde tu app para crear un nuevo grupo de votantes.
           </DialogDescription>
         </DialogHeader>
         <Form {...form}>
@@ -234,16 +251,14 @@ export function CreateGroupDialog() {
               )}
             />
             
-            <FormItem>
-                <FormLabel>Archivo de Votantes</FormLabel>
-                {fileName ? (
-                    <div className="flex items-center justify-between p-3 border rounded-lg bg-muted/50">
-                        <span className='text-sm font-medium truncate'>{fileName}</span>
-                        <Button type="button" variant="ghost" size="icon" className="h-6 w-6" onClick={handleRemoveFile} disabled={isLoading}>
-                            <Trash2 className="h-4 w-4 text-destructive"/>
-                        </Button>
-                    </div>
-                ) : (
+            <Tabs value={activeTab} onValueChange={setActiveTab}>
+              <TabsList className='grid w-full grid-cols-2'>
+                <TabsTrigger value="upload">Subir Archivo</TabsTrigger>
+                <TabsTrigger value="import">Importar de App</TabsTrigger>
+              </TabsList>
+              <TabsContent value="upload" className="mt-4">
+                 <FormItem>
+                    <FormLabel className='sr-only'>Archivo de Votantes</FormLabel>
                     <div 
                         className={cn("relative flex flex-col items-center justify-center w-full p-6 border-2 border-dashed rounded-lg cursor-pointer hover:border-primary/50 transition-colors",
                             isDragging && "border-primary bg-primary/10"
@@ -268,17 +283,40 @@ export function CreateGroupDialog() {
                             disabled={isLoading}
                         />
                     </div>
-                )}
-                <FormDescription>
-                    Se usará la primera columna para el 'id', la segunda para 'apellido' y la tercera para 'nombre'.
-                </FormDescription>
-            </FormItem>
+                    <FormDescription className="pt-2">
+                        Se usará la primera columna para el 'id', la segunda para 'apellido' y la tercera para 'nombre'.
+                    </FormDescription>
+                </FormItem>
+              </TabsContent>
+              <TabsContent value="import" className="mt-4">
+                <div className="flex flex-col items-center justify-center text-center p-6 border-2 border-dashed rounded-lg">
+                    <Import className="w-12 h-12 text-muted-foreground mb-4" />
+                    <h3 className="text-lg font-semibold">Importar desde tu App de Listas</h3>
+                    <p className="text-sm text-muted-foreground mt-2 mb-4 max-w-sm">
+                        Conecta y selecciona una lista de votantes desde tu aplicación externa.
+                    </p>
+                    <Button type="button" onClick={handleImportFromApp}>
+                        <Import className="mr-2 h-4 w-4" />
+                        Conectar y Seleccionar Lista
+                    </Button>
+                </div>
+              </TabsContent>
+            </Tabs>
+
 
             {parsedVoters.length > 0 && (
                 <div className="space-y-2">
-                    <h4 className="text-sm font-medium">
-                        Votantes a Importar: {parsedVoters.length} (Se omitirán {parsedVoters.length - (new Set(parsedVoters.map(v => v.id))).size} duplicados)
-                    </h4>
+                    <div className="flex items-center justify-between">
+                        <h4 className="text-sm font-medium">
+                            Votantes a Importar: {parsedVoters.length}
+                        </h4>
+                        <Button type="button" variant="ghost" size="sm" className="h-auto px-2 py-1 text-xs" onClick={handleRemoveFile}>
+                           <Trash2 className="mr-1 h-3 w-3" /> Limpiar
+                        </Button>
+                    </div>
+                    <p className='text-sm text-muted-foreground -mt-2'>
+                        Archivo: <span className='font-medium'>{fileName}</span>. Duplicados serán omitidos.
+                    </p>
                     <ScrollArea className="h-40 border rounded-md">
                         <Table>
                             <TableHeader>
