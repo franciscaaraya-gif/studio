@@ -3,7 +3,7 @@
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useUser, useDoc, useFirestore, useMemoFirebase } from '@/firebase';
-import { doc, updateDoc } from 'firebase/firestore';
+import { doc, collection, query, where, getDocs, writeBatch, limit } from 'firebase/firestore';
 import { VoterGroup } from '@/lib/types';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -29,16 +29,39 @@ export default function GroupDetailsPage() {
   const { data: group, isLoading, error } = useDoc<VoterGroup>(groupRef);
 
   const handleVoterStatusChange = async (voterId: string, newStatus: boolean) => {
-    if (!firestore || !user || !group || !groupRef) return;
+    if (!firestore || !user || !group || !groupRef || !groupId) return;
 
     const updatedVoters = group.voters.map(v =>
         v.id === voterId ? { ...v, enabled: newStatus } : v
     );
 
     try {
-        await updateDoc(groupRef, { voters: updatedVoters });
+        const batch = writeBatch(firestore);
+
+        // 1. Update the main group document
+        batch.update(groupRef, { voters: updatedVoters });
+
+        // 2. Propagate change to all active polls that use this group
+        const pollsRef = collection(firestore, 'admins', user.uid, 'polls');
+        const activePollsQuery = query(pollsRef, where('groupId', '==', groupId), where('status', '==', 'active'));
+        const activePollsSnapshot = await getDocs(activePollsQuery);
+
+        for (const pollDoc of activePollsSnapshot.docs) {
+            const votersSubcollectionRef = collection(pollDoc.ref, 'voters');
+            const voterInPollQuery = query(votersSubcollectionRef, where('voterId', '==', voterId), limit(1));
+            const voterSnapshot = await getDocs(voterInPollQuery);
+
+            if (!voterSnapshot.empty) {
+                const voterDocToUpdateRef = voterSnapshot.docs[0].ref;
+                batch.update(voterDocToUpdateRef, { enabled: newStatus });
+            }
+        }
+        
+        await batch.commit();
+
         toast({
             title: "Estado del votante actualizado",
+            description: `El estado se actualizó en el grupo y en ${activePollsSnapshot.size} encuesta(s) activa(s).`,
         });
     } catch (err: any) {
         errorEmitter.emit('permission-error', new FirestorePermissionError({

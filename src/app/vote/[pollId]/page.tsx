@@ -16,7 +16,7 @@ import { Button } from '@/components/ui/button';
 import { AlertCircle, ArrowLeft, Loader2 } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useAuth, useFirestore, useUser } from '@/firebase';
-import { Poll, PollLookup, VoterStatus, VoterGroup } from '@/lib/types';
+import { Poll, PollLookup, VoterStatus } from '@/lib/types';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
@@ -67,31 +67,22 @@ function VotePageClient() {
             setIsFetchingData(true);
             setError('');
             try {
+                // Get adminId from public lookup
                 const lookupSnap = await getDoc(doc(firestore, 'poll-lookup', pollId));
                 if (!lookupSnap.exists()) throw new Error('Encuesta no encontrada o inválida.');
                 const adminId = (lookupSnap.data() as PollLookup).adminId;
                 setAdminId(adminId);
 
+                // Get Poll data
                 const pollSnap = await getDoc(doc(firestore, 'admins', adminId, 'polls', pollId));
                 if (!pollSnap.exists()) throw new Error('Encuesta no encontrada o inválida.');
                 
                 const pollData = { id: pollSnap.id, ...pollSnap.data() } as Poll;
                 if (pollData.status !== 'active') throw new Error('Esta encuesta no se encuentra activa en este momento.');
-
-                // Check if the voter is enabled in the source group
-                const groupRef = doc(firestore, 'admins', adminId, 'groups', pollData.groupId);
-                const groupSnap = await getDoc(groupRef);
-                if (!groupSnap.exists()) throw new Error('El grupo de votantes asociado a esta encuesta no fue encontrado.');
                 
-                const groupData = groupSnap.data() as VoterGroup;
-                const voterInfo = groupData.voters.find(v => v.id === voterId);
-
-                if (!voterInfo || voterInfo.enabled === false) {
-                    throw new Error('No tienes permitido votar en esta encuesta.');
-                }
-
                 setPoll(pollData);
 
+                // Get this specific voter's status document for this poll
                 const votersRef = collection(firestore, 'admins', adminId, 'polls', pollId, 'voters');
                 const q = query(votersRef, where('voterId', '==', voterId), limit(1));
                 const voterSnap = await getDocs(q);
@@ -99,7 +90,17 @@ function VotePageClient() {
                 if (voterSnap.empty) throw new Error('No eres elegible para votar en esta encuesta, o tu ID de votante es incorrecto.');
 
                 const voterDoc = voterSnap.docs[0];
-                if ((voterDoc.data() as VoterStatus).hasVoted) throw new Error('Ya has emitido tu voto para esta encuesta.');
+                const voterStatusData = voterDoc.data() as VoterStatus;
+
+                // CHECK 1: Has the voter already voted?
+                if (voterStatusData.hasVoted) throw new Error('Ya has emitido tu voto para esta encuesta.');
+                
+                // CHECK 2: Is the voter enabled for this poll?
+                // The `enabled` field is denormalized into the voter document for this check.
+                // It defaults to true if not present for backwards compatibility.
+                if (voterStatusData.enabled === false) {
+                    throw new Error('No tienes permitido votar en esta encuesta.');
+                }
 
                 setVoterDocId(voterDoc.id);
 

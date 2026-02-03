@@ -139,6 +139,7 @@ export function CreatePollDialog() {
                 pollId: newPollRef.id,
                 hasVoted: false,
                 adminId: user.uid, // Denormalize adminId for secure queries
+                enabled: true,
             });
         });
 

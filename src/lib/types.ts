@@ -49,6 +49,7 @@ export type VoterStatus = {
   pollId: string;
   hasVoted: boolean;
   adminId: string;
+  enabled?: boolean;
 };
 
 export type PollLookup = {
