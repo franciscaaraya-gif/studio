@@ -43,7 +43,7 @@ function VotePageClient() {
 
     // Anonymous sign-in effect
     useEffect(() => {
-        if (!auth || isAuthLoading || user) return;
+        if (!auth || isUserLoading || user) return;
 
         signInAnonymously(auth).catch(err => {
             setError("Se requiere autenticación para votar.");
@@ -86,8 +86,9 @@ function VotePageClient() {
                 const groupData = groupSnap.data() as VoterGroup;
                 const voterInfo = groupData.voters.find(v => v.id === voterId);
 
-                if (!voterInfo) throw new Error('No perteneces al grupo de votantes de esta encuesta.');
-                if (voterInfo.enabled === false) throw new Error('Tu participación en esta encuesta ha sido deshabilitada por el administrador.');
+                if (!voterInfo || voterInfo.enabled === false) {
+                    throw new Error('No tienes permitido votar en esta encuesta.');
+                }
 
                 setPoll(pollData);
 
