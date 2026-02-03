@@ -5,8 +5,9 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { useState } from 'react';
-import { Loader2 } from 'lucide-react';
+import { ArrowLeft, Loader2 } from 'lucide-react';
 import { collection } from 'firebase/firestore';
+import Link from 'next/link';
 
 import { useCollection, useFirestore, useMemoFirebase } from '@/firebase';
 import { Sala } from '@/lib/types';
@@ -27,13 +28,12 @@ export default function VoterInboxLoginPage() {
   
   const firestore = useFirestore();
 
-  // The salas collection is public, so we don't need to sign in to read it.
   const salasQuery = useMemoFirebase(() => {
     if (!firestore) return null;
     return collection(firestore, 'salas');
   }, [firestore]);
   
-  const { data: salas, isLoading: salasLoading } = useCollection<Sala>(salasQuery);
+  const { data: salas, isLoading: salasLoading, error: salasError } = useCollection<Sala>(salasQuery);
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -44,68 +44,102 @@ export default function VoterInboxLoginPage() {
     setIsSubmitting(true);
     const salaAdminId = values.salaAdminId;
     const voterId = values.voterId.trim();
-    // The query param is still called `salaId` but it contains the admin UID
     router.push(`/inbox/polls?salaId=${salaAdminId}&voterId=${voterId}`);
   }
 
   const isLoading = salasLoading || isSubmitting;
 
   return (
-    <Card className="shadow-lg">
-      <CardHeader>
-        <CardTitle className="text-2xl font-headline">Bandeja de Votación</CardTitle>
-        <CardDescription>
-            Selecciona la sala de votación e ingresa tu ID para ver tus encuestas.
-        </CardDescription>
-      </CardHeader>
-      <CardContent>
-        <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-            <FormField
-              control={form.control}
-              name="salaAdminId"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Sala de Votación</FormLabel>
-                   <Select onValueChange={field.onChange} defaultValue={field.value} disabled={isLoading}>
+    <>
+      <Card className="shadow-lg">
+        <CardHeader>
+          <CardTitle className="text-2xl font-headline">Bandeja de Votación</CardTitle>
+          <CardDescription>
+              Selecciona la sala de votación e ingresa tu ID para ver tus encuestas.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <Form {...form}>
+            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+              <FormField
+                control={form.control}
+                name="salaAdminId"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Sala de Votación</FormLabel>
+                    <Select onValueChange={field.onChange} defaultValue={field.value} disabled={isLoading}>
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder={isLoading ? "Cargando salas..." : "Selecciona una sala"} />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {!isLoading && salas?.length === 0 && (
+                          <p className="p-4 text-sm text-muted-foreground">No hay salas disponibles.</p>
+                        )}
+                        {salas?.map(sala => (
+                          <SelectItem key={sala.id} value={sala.adminId}>{sala.name}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="voterId"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>ID de Votante</FormLabel>
                     <FormControl>
-                      <SelectTrigger>
-                        <SelectValue placeholder={isLoading ? "Cargando salas..." : "Selecciona una sala"} />
-                      </SelectTrigger>
+                      <Input placeholder="Pega tu ID de votante aquí" {...field} disabled={isLoading} />
                     </FormControl>
-                    <SelectContent>
-                      {!isLoading && salas?.length === 0 && (
-                        <p className="p-4 text-sm text-muted-foreground">No hay salas disponibles. Contacta al administrador.</p>
-                      )}
-                      {salas?.map(sala => (
-                        <SelectItem key={sala.id} value={sala.adminId}>{sala.name}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <FormMessage />
-                </FormItem>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <Button type="submit" className="w-full mt-4" disabled={isLoading}>
+                {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                Ver mis encuestas
+              </Button>
+            </form>
+          </Form>
+        </CardContent>
+      </Card>
+      
+      {/* Panel de depuración */}
+      <Card className="mt-4">
+          <CardHeader>
+              <CardTitle>Estado de Depuración</CardTitle>
+              <CardDescription>
+                  Esta sección nos ayudará a ver qué está pasando con los datos de las salas.
+              </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-2 text-sm">
+              <p>Cargando salas: <span className='font-mono'>{salasLoading ? 'Sí' : 'No'}</span></p>
+              {salasError && (
+                  <div>
+                      <p className="font-bold text-destructive">Error detectado:</p>
+                      <pre className="mt-2 w-full rounded-md bg-slate-950 p-4 text-white text-xs overflow-auto">
+                          <code>{salasError.message}</code>
+                      </pre>
+                  </div>
               )}
-            />
-            <FormField
-              control={form.control}
-              name="voterId"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>ID de Votante</FormLabel>
-                  <FormControl>
-                    <Input placeholder="Pega tu ID de votante aquí" {...field} disabled={isLoading} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
+              <p>Número de salas encontradas: <span className='font-mono'>{salas ? salas.length : '0'}</span></p>
+              {salas && salas.length > 0 && (
+                  <div>
+                      <p className="font-bold">Datos de las salas recibidos:</p>
+                      <pre className="mt-2 w-full rounded-md bg-slate-950 p-4 text-white text-xs overflow-auto">
+                          <code>{JSON.stringify(salas, null, 2)}</code>
+                      </pre>
+                  </div>
               )}
-            />
-            <Button type="submit" className="w-full mt-4" disabled={isLoading}>
-              {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              Ver mis encuestas
-            </Button>
-          </form>
-        </Form>
-      </CardContent>
-    </Card>
+              {salas && salas.length === 0 && !salasLoading && (
+                  <p className="text-muted-foreground">La consulta a la base de datos fue exitosa, pero no se devolvió ninguna sala. Revisa que la colección 'salas' exista y tenga documentos.</p>
+              )}
+          </CardContent>
+      </Card>
+    </>
   );
 }
