@@ -16,7 +16,7 @@ import { Button } from '@/components/ui/button';
 import { AlertCircle, ArrowLeft, Loader2 } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useAuth, useFirestore, useUser } from '@/firebase';
-import { Poll, PollLookup, VoterStatus } from '@/lib/types';
+import { Poll, PollLookup, VoterStatus, VoterGroup } from '@/lib/types';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
@@ -77,6 +77,18 @@ function VotePageClient() {
                 
                 const pollData = { id: pollSnap.id, ...pollSnap.data() } as Poll;
                 if (pollData.status !== 'active') throw new Error('Esta encuesta no se encuentra activa en este momento.');
+
+                // Check if the voter is enabled in the source group
+                const groupRef = doc(firestore, 'admins', adminId, 'groups', pollData.groupId);
+                const groupSnap = await getDoc(groupRef);
+                if (!groupSnap.exists()) throw new Error('El grupo de votantes asociado a esta encuesta no fue encontrado.');
+                
+                const groupData = groupSnap.data() as VoterGroup;
+                const voterInfo = groupData.voters.find(v => v.id === voterId);
+
+                if (!voterInfo) throw new Error('No perteneces al grupo de votantes de esta encuesta.');
+                if (voterInfo.enabled === false) throw new Error('Tu participación en esta encuesta ha sido deshabilitada por el administrador.');
+
                 setPoll(pollData);
 
                 const votersRef = collection(firestore, 'admins', adminId, 'polls', pollId, 'voters');
