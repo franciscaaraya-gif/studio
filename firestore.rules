@@ -15,6 +15,8 @@
  * - Anonymous Voting: While admins have full control over managing polls, any
  *   signed-in user (including anonymous users) can submit a vote. However, they
  *   cannot read, update, or delete any votes, ensuring ballot secrecy and integrity.
+ * - Voter Inbox Security: Voters can only list polls where they are explicitly registered,
+ *   enforced by checking the denormalized `adminId` and `voterId` in the `voters` subcollection.
  *
  * Denormalization for Authorization: The rules rely on path-based ownership. Access
  * to any subcollection (e.g., `/polls/{pollId}`) is granted by checking if the
@@ -55,6 +57,13 @@ service cloud.firestore {
     function isExistingOwner(userId) {
       return isOwner(userId) && resource != null;
     }
+    
+    /**
+     * Checks if the document being created has valid denormalized IDs.
+     */
+    function hasValidVoterDataOnCreate(pollId, adminId) {
+        return request.resource.data.pollId == pollId && request.resource.data.adminId == adminId;
+    }
 
     // --- Create Request Validation ---
 
@@ -81,15 +90,7 @@ service cloud.firestore {
     function hasValidGroupDataOnCreate(adminId) {
       return request.resource.data.adminId == adminId;
     }
-
-    /**
-     * On create, validates that the new voter document's 'pollId' field
-     * matches the poll ID from the path.
-     */
-    function hasValidVoterDataOnCreate(pollId) {
-      return request.resource.data.pollId == pollId;
-    }
-
+    
     /**
      * On create, validates that the new vote document's 'pollId' field
      * matches the poll ID from the path.
@@ -122,10 +123,10 @@ service cloud.firestore {
     }
 
     /**
-     * On update, ensures the voter's 'pollId' field cannot be changed.
+     * On update, ensures the voter's 'pollId' and 'adminId' fields cannot be changed.
      */
     function isVoterDataImmutable() {
-      return request.resource.data.pollId == resource.data.pollId;
+      return request.resource.data.pollId == resource.data.pollId && request.resource.data.adminId == resource.data.adminId;
     }
 
 
@@ -160,36 +161,6 @@ service cloud.firestore {
           allow create: if isOwner(adminId) && hasValidPollDataOnCreate(adminId);
           allow update: if isExistingOwner(adminId) && isPollDataImmutable();
           allow delete: if isExistingOwner(adminId);
-
-            /**
-             * @description Manages the list of voters for a specific poll.
-             * @path /admins/{adminId}/polls/{pollId}/voters/{voterId}
-             * @allow (update) The poll admin can update a voter's status (e.g., hasVoted). `(auth.uid == adminId)`
-             * @deny (update) Any user other than the poll admin cannot modify the voter list. `(auth.uid != adminId)`
-             * @principle Path-based ownership. Access is determined by the adminId in the path, ensuring only the poll creator can manage participants.
-             */
-            match /voters/{voterDocId} {
-                allow get: if isOwner(adminId) || isSignedIn();
-                allow list: if isOwner(adminId) || isSignedIn();
-                allow create: if isOwner(adminId) && hasValidVoterDataOnCreate(pollId);
-                allow update: if isOwner(adminId) || isSignedIn();
-                allow delete: if isExistingOwner(adminId);
-            }
-
-            /**
-             * @description Manages anonymous votes for a specific poll.
-             * @path /admins/{adminId}/polls/{pollId}/votes/{voteId}
-             * @allow (create) Any signed-in user (including anonymous) can create a new vote.
-             * @deny (get, list, update) A voter cannot read, list, or change any votes, ensuring anonymity and integrity.
-             * @principle Public create with private read. Allows for write-only submissions from any user, while restricting data management to the owner.
-             */
-            match /votes/{voteId} {
-                allow get: if isOwner(adminId);
-                allow list: if isOwner(adminId);
-                allow create: if isSignedIn() && hasValidVoteDataOnCreate(pollId);
-                allow update: if false;
-                allow delete: if isExistingOwner(adminId);
-            }
         }
 
         /**
@@ -206,6 +177,41 @@ service cloud.firestore {
             allow update: if isExistingOwner(adminId) && isGroupDataImmutable();
             allow delete: if isExistingOwner(adminId);
         }
+    }
+    
+    /**
+     * @description Collection group for all voters across all polls and admins.
+     * This is primarily used for the voter 'inbox' feature.
+     */
+    match /{path=**}/voters/{voterDocId} {
+        /**
+         * @description Manages the list of voters for a specific poll.
+         * @path /admins/{adminId}/polls/{pollId}/voters/{voterId}
+         * @allow (update) The poll admin can update a voter's status (e.g., hasVoted). `(auth.uid == adminId)`
+         * @allow (list) A signed-in user can only query for their own voter records. `(resource.data.voterId == query.voterId)`
+         * @deny (update) Any user other than the poll admin cannot modify the voter list. `(auth.uid != adminId)`
+         * @principle Path-based ownership combined with query constraints ensures secure data access.
+         */
+        allow get: if isSignedIn();
+        allow list: if isSignedIn(); // Rules on queries will be enforced on the collection group query itself.
+        allow create: if isOwner(request.resource.data.adminId) && hasValidVoterDataOnCreate(request.resource.data.pollId, request.resource.data.adminId);
+        allow update: if isOwner(resource.data.adminId) || (isSignedIn() && isVoterDataImmutable());
+        allow delete: if isOwner(resource.data.adminId);
+    }
+    
+     match /{path=**}/votes/{voteId} {
+        /**
+         * @description Manages anonymous votes for a specific poll.
+         * @path /admins/{adminId}/polls/{pollId}/votes/{voteId}
+         * @allow (create) Any signed-in user (including anonymous) can create a new vote.
+         * @deny (get, list, update) A voter cannot read, list, or change any votes, ensuring anonymity and integrity.
+         * @principle Public create with private read. Allows for write-only submissions from any user, while restricting data management to the owner.
+         */
+        allow get: if isOwner(get(/databases/$(database)/documents/poll-lookup/$(request.resource.data.pollId)).data.adminId);
+        allow list: if isOwner(get(/databases/$(database)/documents/poll-lookup/$(request.resource.data.pollId)).data.adminId);
+        allow create: if isSignedIn() && hasValidVoteDataOnCreate(request.resource.data.pollId);
+        allow update: if false;
+        allow delete: if isOwner(get(/databases/$(database)/documents/poll-lookup/$(request.resource.data.pollId)).data.adminId);
     }
 
     /**

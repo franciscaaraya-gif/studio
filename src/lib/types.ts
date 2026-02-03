@@ -45,6 +45,7 @@ export type VoterStatus = {
   voterId: string; // The business logic ID of the voter
   pollId: string;
   hasVoted: boolean;
+  adminId: string;
 };
 
 export type PollLookup = {

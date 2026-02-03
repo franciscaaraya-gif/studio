@@ -4,7 +4,7 @@ export const dynamic = 'force-dynamic';
 import { Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useEffect, useState } from 'react';
-import { collectionGroup, query, where, getDocs, doc, getDoc } from 'firebase/firestore';
+import { collectionGroup, query, where, getDocs, doc, getDoc, and } from 'firebase/firestore';
 import { signInAnonymously } from 'firebase/auth';
 import Link from 'next/link';
 
@@ -22,6 +22,7 @@ function PollsInboxClient() {
     const searchParams = useSearchParams();
     const router = useRouter();
     const voterId = searchParams.get('voterId');
+    const salaId = searchParams.get('salaId');
 
     const [polls, setPolls] = useState<Poll[]>([]);
     const [error, setError] = useState<string>('');
@@ -41,7 +42,7 @@ function PollsInboxClient() {
     }, [auth, user, isAuthLoading]);
 
     useEffect(() => {
-        if (!voterId) {
+        if (!voterId || !salaId) {
             router.replace('/inbox');
             return;
         }
@@ -55,17 +56,19 @@ function PollsInboxClient() {
             setError('');
             try {
                 const votersCollectionGroup = collectionGroup(firestore, 'voters');
-                const q = query(votersCollectionGroup, where('voterId', '==', voterId));
+                // Query for voter documents matching both adminId (salaId) and voterId
+                const q = query(votersCollectionGroup, and(
+                    where('adminId', '==', salaId),
+                    where('voterId', '==', voterId)
+                ));
                 const querySnapshot = await getDocs(q);
 
                 const eligiblePollPromises = querySnapshot.docs
                     .filter(voterDoc => !(voterDoc.data() as VoterStatus).hasVoted)
                     .map(async (voterDoc) => {
-                        const pathSegments = voterDoc.ref.path.split('/');
-                        const adminId = pathSegments[1];
-                        const pollId = pathSegments[3];
-                        
-                        const pollRef = doc(firestore, 'admins', adminId, 'polls', pollId);
+                        const voterData = voterDoc.data() as VoterStatus;
+                        // The pollId is in the voter document itself.
+                        const pollRef = doc(firestore, 'admins', voterData.adminId, 'polls', voterData.pollId);
                         const pollSnap = await getDoc(pollRef);
 
                         if (pollSnap.exists() && pollSnap.data().status === 'active') {
@@ -80,7 +83,9 @@ function PollsInboxClient() {
             } catch (err: any) {
                 console.error(err);
                 if (err.code === 'failed-precondition' && err.message.includes('index')) {
-                    setError('La base de datos requiere una configuración de índice para esta consulta. Contacta al administrador.');
+                    setError('La base de datos requiere una configuración de índice para esta consulta. Contacta al administrador. Si eres el administrador, el error en la consola del navegador contendrá un enlace para crear el índice requerido.');
+                } else if(err.code === 'permission-denied') {
+                     setError('Permiso denegado. Verifica que el ID de la sala y tu ID de votante sean correctos.');
                 } else {
                     setError('No se pudieron cargar las encuestas. Inténtalo de nuevo más tarde.');
                 }
@@ -90,7 +95,7 @@ function PollsInboxClient() {
         };
 
         fetchEligiblePolls();
-    }, [firestore, user, isAuthLoading, voterId, router]);
+    }, [firestore, user, isAuthLoading, voterId, salaId, router]);
 
 
     if (isLoading || isAuthLoading) {
@@ -126,6 +131,7 @@ function PollsInboxClient() {
         <div className="w-full space-y-4">
              <div className="text-center">
                 <h1 className="text-2xl font-bold font-headline">Tus Encuestas Activas</h1>
+                <p className="text-muted-foreground">Sala: <span className="font-mono text-sm bg-muted px-2 py-1 rounded">{salaId}</span></p>
                 <p className="text-muted-foreground">ID de Votante: <span className="font-mono text-sm bg-muted px-2 py-1 rounded">{voterId}</span></p>
              </div>
 
@@ -159,7 +165,7 @@ function PollsInboxClient() {
             )}
             <div className="text-center mt-4">
                  <Button variant="link" asChild>
-                    <Link href="/inbox">Usar otro ID de votante</Link>
+                    <Link href="/inbox">Usar otra identificación</Link>
                 </Button>
             </div>
         </div>

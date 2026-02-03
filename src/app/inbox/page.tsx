@@ -13,6 +13,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '
 import { Input } from '@/components/ui/input';
 
 const formSchema = z.object({
+  salaId: z.string().min(1, { message: 'El ID de la sala es requerido.' }),
   voterId: z.string().min(1, { message: 'Tu ID de votante es requerido.' }),
 });
 
@@ -22,13 +23,14 @@ export default function VoterInboxLoginPage() {
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
-    defaultValues: { voterId: '' },
+    defaultValues: { salaId: '', voterId: '' },
   });
 
   async function onSubmit(values: z.infer<typeof formSchema>) {
     setIsLoading(true);
+    const salaId = values.salaId.trim();
     const voterId = values.voterId.trim();
-    router.push(`/inbox/polls?voterId=${voterId}`);
+    router.push(`/inbox/polls?salaId=${salaId}&voterId=${voterId}`);
   }
 
   return (
@@ -36,12 +38,25 @@ export default function VoterInboxLoginPage() {
       <CardHeader>
         <CardTitle className="text-2xl font-headline">Bandeja de Votación</CardTitle>
         <CardDescription>
-            Ingresa tu ID de votante para ver las encuestas en las que puedes participar.
+            Ingresa el ID de la sala y tu ID de votante para ver tus encuestas.
         </CardDescription>
       </CardHeader>
       <CardContent>
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+            <FormField
+              control={form.control}
+              name="salaId"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>ID de la Sala</FormLabel>
+                  <FormControl>
+                    <Input placeholder="Pega el ID de la sala aquí" {...field} disabled={isLoading} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
             <FormField
               control={form.control}
               name="voterId"
