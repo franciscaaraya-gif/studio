@@ -90,14 +90,6 @@ service cloud.firestore {
     function hasValidGroupDataOnCreate(adminId) {
       return request.resource.data.adminId == adminId;
     }
-    
-    /**
-     * On create, validates that the new vote document's 'pollId' field
-     * matches the poll ID from the path.
-     */
-    function hasValidVoteDataOnCreate(pollId) {
-      return request.resource.data.pollId == pollId;
-    }
 
     // --- Update Request Validation ---
 
@@ -161,6 +153,17 @@ service cloud.firestore {
           allow create: if isOwner(adminId) && hasValidPollDataOnCreate(adminId);
           allow update: if isExistingOwner(adminId) && isPollDataImmutable();
           allow delete: if isExistingOwner(adminId);
+
+          /**
+           * @description Manages votes for a specific poll, only accessible by the admin owner.
+           * @path /admins/{adminId}/polls/{pollId}/votes/{voteId}
+           * @allow (read, delete) Admin owner can read and delete votes.
+           * @deny (create, update) Creation is handled by the public-facing collection group rule.
+           */
+          match /votes/{voteId} {
+            allow get, list, delete: if isOwner(adminId);
+            allow create, update: if false;
+          }
         }
 
         /**
@@ -204,14 +207,11 @@ service cloud.firestore {
          * @description Manages anonymous votes for a specific poll.
          * @path /admins/{adminId}/polls/{pollId}/votes/{voteId}
          * @allow (create) Any signed-in user (including anonymous) can create a new vote.
-         * @deny (get, list, update) A voter cannot read, list, or change any votes, ensuring anonymity and integrity.
-         * @principle Public create with private read. Allows for write-only submissions from any user, while restricting data management to the owner.
+         * @deny (read, update, delete) Prevents anyone from reading or modifying votes through this general rule.
+         * @principle Public create with private read. Admin access is defined in a more specific, nested rule.
          */
-        allow get: if isOwner(get(/databases/$(database)/documents/poll-lookup/$(request.resource.data.pollId)).data.adminId);
-        allow list: if isOwner(get(/databases/$(database)/documents/poll-lookup/$(request.resource.data.pollId)).data.adminId);
-        allow create: if isSignedIn() && hasValidVoteDataOnCreate(request.resource.data.pollId);
-        allow update: if false;
-        allow delete: if isOwner(get(/databases/$(database)/documents/poll-lookup/$(request.resource.data.pollId)).data.adminId);
+        allow get, list, update, delete: if false;
+        allow create: if isSignedIn() && request.resource.data.pollId != null && request.resource.data.adminId != null;
     }
 
     /**

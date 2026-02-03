@@ -39,6 +39,8 @@ export type Vote = {
     id: string;
     pollId: string;
     selectedOptions: string[];
+    adminId: string;
+    createdAt: Timestamp;
 }
 
 export type VoterStatus = {

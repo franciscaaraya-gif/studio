@@ -129,6 +129,7 @@ function VotePageClient() {
             const newVoteRef = doc(votesRef);
             batch.set(newVoteRef, {
                 pollId: poll.id,
+                adminId: adminId,
                 selectedOptions: Array.isArray(values.selectedOptions) ? values.selectedOptions : [values.selectedOptions],
                 createdAt: serverTimestamp(),
             });
