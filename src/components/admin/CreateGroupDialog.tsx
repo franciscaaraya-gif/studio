@@ -5,7 +5,7 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import * as XLSX from 'xlsx';
-import { addDoc, collection, serverTimestamp, getDocs, query, orderBy, where, type Firestore, doc } from 'firebase/firestore';
+import { addDoc, collection, serverTimestamp, getDocs, query, orderBy, where, type Firestore, doc, getDoc } from 'firebase/firestore';
 import { initializeApp, getApp, type FirebaseApp, deleteApp } from 'firebase/app';
 import { getFirestore } from 'firebase/firestore';
 import { FileUp, Loader2, PlusCircle, Trash2, Import, Info } from 'lucide-react';
@@ -86,8 +86,10 @@ export function CreateGroupDialog() {
     setIsImporting(false);
 
     try {
-      const appInstance = getApp('import-app');
-      await deleteApp(appInstance);
+      if (getApp('import-app')) {
+        const appInstance = getApp('import-app');
+        await deleteApp(appInstance);
+      }
     } catch (e) {
       // App might not have been initialized, safe to ignore
     }
@@ -101,22 +103,23 @@ export function CreateGroupDialog() {
     const connectAndFetch = async () => {
         setIsLoadingLlamados(true);
         setLoadLlamadosError('');
+        setLlamados([]);
 
         // --- GUÍA DE CONFIGURACIÓN ---
         // Pega aquí la configuración de Firebase de tu "App de Listas".
         // La encuentras en la Consola de Firebase > Configuración del Proyecto.
         const secondaryFirebaseConfig = {
-            apiKey: "TU_API_KEY_AQUI",
-            authDomain: "TU_PROJECT_ID.firebaseapp.com",
-            projectId: "TU_PROJECT_ID",
-            storageBucket: "TU_PROJECT_ID.appspot.com",
-            messagingSenderId: "TU_MESSAGING_SENDER_ID",
-            appId: "TU_APP_ID"
+          apiKey: "AIzaSyDgY7LvFOr5Hv4xAb2tdgUhZGUs9SO2WLw",
+          authDomain: "ma-apps-2d75f.firebaseapp.com",
+          projectId: "ma-apps-2d75f",
+          storageBucket: "ma-apps-2d75f.firebasestorage.app",
+          messagingSenderId: "841893715709",
+          appId: "1:841893715709:web:30918447bb56fca4b92894"
         };
         // -----------------------------
 
-        if (secondaryFirebaseConfig.apiKey === "TU_API_KEY_AQUI") {
-            setLoadLlamadosError("La configuración de la 'App de Listas' aún no se ha añadido. Edita el archivo src/components/admin/CreateGroupDialog.tsx para añadirla.");
+        if (!secondaryFirebaseConfig.apiKey || secondaryFirebaseConfig.apiKey === "TU_API_KEY_AQUI") {
+            setLoadLlamadosError("La configuración de la 'App de Listas' aún no se ha añadido. Edita este archivo para añadirla.");
             setIsLoadingLlamados(false);
             return;
         }
@@ -132,17 +135,33 @@ export function CreateGroupDialog() {
             const db = getFirestore(appInstance);
             setSecondaryDb(db);
 
-            const callsCol = collection(db, 'llamados');
             // ¡AJUSTA ESTO! Asegúrate de que 'llamados' tenga un campo de fecha para ordenar.
+            const callsCol = collection(db, 'llamados');
             const q = query(callsCol, orderBy('fecha', 'desc'));
             const snapshot = await getDocs(q);
 
-            const loadedLlamados = snapshot.docs.map(doc => ({
-                id: doc.id,
-                // ¡AJUSTA ESTO! Cambia 'nombre' si el campo se llama diferente.
-                nombre: doc.data().nombre || `Llamado del ${new Date(doc.data().fecha.seconds * 1000).toLocaleDateString()}`,
-                fecha: doc.data().fecha,
-            }));
+            const loadedLlamados = snapshot.docs.map(doc => {
+                const data = doc.data();
+                const fecha = data.fecha;
+                let nombreLlamado = data.nombre;
+
+                // Create a robust name for the call
+                if (!nombreLlamado) {
+                    if (fecha && typeof fecha.seconds === 'number') {
+                        // Fallback to date if name is missing
+                        nombreLlamado = `Llamado del ${new Date(fecha.seconds * 1000).toLocaleDateString()}`;
+                    } else {
+                        // Fallback to ID if name and date are missing/invalid
+                        nombreLlamado = `Llamado ID: ${doc.id}`;
+                    }
+                }
+                
+                return {
+                    id: doc.id,
+                    nombre: nombreLlamado,
+                    fecha: data.fecha,
+                };
+            });
             
             setLlamados(loadedLlamados);
         } catch (error: any) {
@@ -220,7 +239,6 @@ export function CreateGroupDialog() {
       setIsImporting(true);
       setParsedVoters([]);
       try {
-        // ¡AJUSTA ESTO! Asegúrate de que el documento del llamado tiene un array llamado 'voluntarios'
         const llamadoDocRef = doc(secondaryDb, "llamados", selectedLlamadoId);
         const llamadoDoc = await getDoc(llamadoDocRef);
 
@@ -228,9 +246,10 @@ export function CreateGroupDialog() {
              throw new Error("El llamado seleccionado ya no existe.");
         }
         
+        // ¡AJUSTA ESTO! Asegúrate de que tus documentos de 'llamados' tienen un array llamado 'voluntarios'
         const volunteerIds = llamadoDoc.data().voluntarios;
         if (!Array.isArray(volunteerIds) || volunteerIds.length === 0) {
-            toast({ title: "No se encontraron voluntarios", description: "Este llamado no tiene voluntarios asociados." });
+            toast({ title: "No se encontraron voluntarios", description: "Este llamado no tiene voluntarios asociados para importar." });
             setIsImporting(false);
             return;
         }
@@ -238,8 +257,13 @@ export function CreateGroupDialog() {
         const volunteersData: ParsedVoter[] = [];
         const volunteersCol = collection(secondaryDb, 'voluntarios');
         
+        // Firestore 'in' queries are limited to 30 items. We process in chunks.
         for (let i = 0; i < volunteerIds.length; i += 30) {
-            const chunk = volunteerIds.slice(i, i + 30);
+            // Filter out any empty/invalid IDs from the chunk
+            const chunk = volunteerIds.slice(i, i + 30).filter(id => typeof id === 'string' && id.length > 0);
+            
+            if (chunk.length === 0) continue; // Skip empty chunks
+
             const qVoluntarios = query(volunteersCol, where('__name__', 'in', chunk));
             const voluntariosSnap = await getDocs(qVoluntarios);
             
@@ -260,7 +284,14 @@ export function CreateGroupDialog() {
         toast({ title: "Voluntarios importados", description: `Se han cargado ${volunteersData.length} voluntarios.` });
 
       } catch (error: any) {
-         toast({ variant: "destructive", title: "Error al importar", description: error.message });
+         console.error("Error al importar voluntarios:", error);
+         let description = "Ocurrió un error desconocido. Revisa la consola para más detalles.";
+         if (error.code === 'permission-denied') {
+            description = "Permiso denegado. Asegúrate de que las reglas de seguridad de tu 'App de Listas' permitan la lectura.";
+         } else {
+            description = error.message;
+         }
+         toast({ variant: "destructive", title: "Error al importar", description: description });
       } finally {
         setIsImporting(false);
       }
@@ -353,7 +384,7 @@ export function CreateGroupDialog() {
                                         </SelectContent>
                                     </Select>
                                 </FormItem>
-                                <Button type="button" onClick={handleImportFromLlamado} disabled={isImporting || !selectedLlamadoId}>
+                                <Button type="button" onClick={handleImportFromLlamado} disabled={isImporting || !selectedLlamadoId || !secondaryDb}>
                                     {isImporting ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : <Import className="mr-2 h-4 w-4" />}
                                     2. Importar Voluntarios del Llamado
                                 </Button>
