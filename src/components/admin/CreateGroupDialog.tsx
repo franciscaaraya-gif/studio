@@ -161,41 +161,31 @@ export function CreateGroupDialog() {
   }
   
   const handleImportFromApp = () => {
-    // --- PUNTO DE INTEGRACIÓN ---
-    // Esta función se activa al presionar el botón "Conectar y Seleccionar Lista".
-    // La URL que proporcionaste no es un endpoint de API REST, sino un canal interno de Firestore.
-    // Para que esto funcione, necesitas un endpoint que devuelva una lista de votantes en formato JSON.
-    // Usualmente, esto se logra con una Cloud Function en tu otro proyecto de Firebase.
-    
     /*
-    // --- EJEMPLO DE CÓMO LLAMAR A TU API (CUANDO LA TENGAS) ---
+    // --- GUÍA PARA LA IMPORTACIÓN DESDE TU API ---
+    // 1. Crea y despliega la Cloud Function en tu otro proyecto de Firebase usando el código que te proporcioné.
+    // 2. Al desplegar, Firebase te dará una URL para esa función.
+    // 3. Pega esa URL abajo y descomenta la llamada a la función.
+
     const fetchVotersFromApi = async () => {
         try {
-            // 1. REEMPLAZA ESTA URL:
-            // Esta debe ser la URL de tu Cloud Function o API que devuelve la lista de usuarios.
-            // Ejemplo: 'https://us-central1-TU_PROJECT_ID.cloudfunctions.net/getVotersList'
-            const response = await fetch('https://api.tu-app-de-listas.com/voters');
+            // REEMPLAZA ESTA URL por la que te dio Firebase para tu Cloud Function.
+            const apiUrl = 'https://getvoluntarios-xxxxxxxx-uc.a.run.app';
+            const response = await fetch(apiUrl);
             
             if (!response.ok) {
                 throw new Error(`Error de red: ${'${response.status}'}`);
             }
-            const data = await response.json();
 
-            // 2. AJUSTA LOS DATOS:
-            // El formato esperado es un array de objetos: { id: string, nombre: string, apellido: string }
-            // Adapta el mapeo según la estructura de datos que tu API devuelva.
-            const formattedVoters = data.map(voterFromApi => ({
-                id: voterFromApi.userId, // ej: voterFromApi.id, voterFromApi.user_id
-                nombre: voterFromApi.firstName, // ej: voterFromApi.name
-                apellido: voterFromApi.lastName, // ej: voterFromApi.surname
-                enabled: true,
-            }));
+            // La Cloud Function ya devuelve los datos en el formato que necesitamos:
+            // [{ id: '...', nombre: '...', apellido: '...', enabled: true }]
+            const votersFromApi = await response.json();
             
-            setParsedVoters(formattedVoters);
-            setFileName('Importado desde la API');
+            setParsedVoters(votersFromApi);
+            setFileName('Importado desde la App de Listas');
             toast({
                 title: '¡Lista importada!',
-                description: `Se han cargado ${'${formattedVoters.length}'} votantes desde tu app.`,
+                description: `Se han cargado ${'${votersFromApi.length}'} votantes.`,
             });
 
         } catch (error) {
@@ -203,25 +193,24 @@ export function CreateGroupDialog() {
             toast({
                 variant: 'destructive',
                 title: 'Error de importación',
-                description: 'No se pudo obtener la lista desde la API. Revisa la consola para más detalles.',
+                description: 'No se pudo obtener la lista desde la API. Revisa la consola del navegador para más detalles.',
             });
         }
     };
     
-    // 3. DESCOMENTA ESTA LÍNEA para activar la llamada a la API:
+    // DESCOMENTA ESTA LÍNEA para activar la llamada a la API:
     // fetchVotersFromApi();
     */
 
     // --- SIMULACIÓN ACTUAL (REEMPLAZAR CON LA LÓGICA DE ARRIBA) ---
-    // Por ahora, se cargarán datos de ejemplo para que veas cómo funciona la previsualización.
     toast({
         title: 'Simulación de Importación',
-        description: 'En un caso real, esto conectaría a tu API. Se han cargado datos de ejemplo.',
+        description: 'Esto es un ejemplo. Configura tu API y descomenta el código de arriba para una importación real.',
     });
     const exampleVoters = [
-        { id: 'usr_001', apellido: 'García', nombre: 'Ana', enabled: true },
-        { id: 'usr_002', apellido: 'Martínez', nombre: 'Luis', enabled: true },
-        { id: 'usr_003', apellido: 'López', nombre: 'Elena', enabled: true },
+        { id: 'vol_001', apellido: 'García', nombre: 'Ana', enabled: true },
+        { id: 'vol_002', apellido: 'Martínez', nombre: 'Luis', enabled: true },
+        { id: 'vol_003', apellido: 'López', nombre: 'Elena', enabled: true },
     ];
     setParsedVoters(exampleVoters);
     setFileName('Importado desde App (Ejemplo)');
@@ -379,7 +368,7 @@ export function CreateGroupDialog() {
                             </TableHeader>
                             <TableBody>
                                 {parsedVoters.map((voter, index) => (
-                                    <TableRow key={`${voter.id}-${index}`}>
+                                    <TableRow key={`${'voter.id'}-${index}`}>
                                         <TableCell className="font-mono text-xs">{voter.id}</TableCell>
                                         <TableCell>{voter.nombre} {voter.apellido}</TableCell>
                                     </TableRow>
