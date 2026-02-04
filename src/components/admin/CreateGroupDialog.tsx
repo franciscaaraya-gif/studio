@@ -5,7 +5,7 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import * as XLSX from 'xlsx';
-import { addDoc, collection, serverTimestamp, getDocs, query, orderBy, where, type Firestore, doc } from 'firebase/firestore';
+import { addDoc, collection, serverTimestamp, getDocs, query, where, type Firestore, doc } from 'firebase/firestore';
 import { initializeApp, getApp, type FirebaseApp, deleteApp } from 'firebase/app';
 import { getFirestore } from 'firebase/firestore';
 import { FileUp, Loader2, PlusCircle, Trash2, Import, Info } from 'lucide-react';
@@ -60,7 +60,6 @@ export function CreateGroupDialog() {
   const firestore = useFirestore();
   const { user } = useUser();
 
-  // State for automatic connection
   const [secondaryDb, setSecondaryDb] = useState<Firestore | null>(null);
   const [llamados, setLlamados] = useState<Llamado[]>([]);
   const [isLoadingLlamados, setIsLoadingLlamados] = useState(false);
@@ -95,10 +94,9 @@ export function CreateGroupDialog() {
     }
     setSecondaryDb(null);
   };
-  
-  // This effect runs when the dialog is opened to automatically connect and fetch 'llamados'
+
   useEffect(() => {
-    if (!open) return; // Only run when the dialog is open
+    if (!open) return;
 
     const connectAndFetch = async () => {
         setIsLoadingLlamados(true);
@@ -107,7 +105,6 @@ export function CreateGroupDialog() {
 
         // --- GUÍA DE CONFIGURACIÓN ---
         // Pega aquí la configuración de Firebase de tu "App de Listas".
-        // La encuentras en la Consola de Firebase > Configuración del Proyecto.
         const secondaryFirebaseConfig = {
           apiKey: "AIzaSyDgY7LvFOr5Hv4xAb2tdgUhZGUs9SO2WLw",
           authDomain: "ma-apps-2d75f.firebaseapp.com",
@@ -135,7 +132,6 @@ export function CreateGroupDialog() {
             const db = getFirestore(appInstance);
             setSecondaryDb(db);
 
-            // ¡AJUSTA ESTO! Asegúrate de que 'llamados' tenga un campo de fecha para ordenar.
             const callsCol = collection(db, 'llamados');
             const q = query(callsCol, orderBy('fecha', 'desc'));
             const snapshot = await getDocs(q);
@@ -143,23 +139,20 @@ export function CreateGroupDialog() {
             const loadedLlamados = Object.values(
               snapshot.docs.reduce((acc, doc) => {
                 const data = doc.data();
-                const key = `${data.fecha}|${data.clave}|${data.direccion}|${data.maquina}`;
+                const fechaString = data.fecha ? new Date(data.fecha.seconds * 1000).toLocaleDateString() : 'Invalid Date';
+                const key = `${fechaString}|${data.clave}|${data.direccion}|${data.maquina}`;
             
                 if (acc[key] || !data.clave || !data.direccion || !data.maquina) return acc;
             
                 acc[key] = {
-                  id: key, // 👈 ID compuesto
-                  clave: data.clave,
+                  id: key,
                   fecha: data.fecha,
-                  direccion: data.direccion,
-                  maquina: data.maquina,
-                  nombre: `${data.clave} - ${data.direccion} - ${data.maquina}`,
+                  nombre: `${fechaString} - ${data.clave} - ${data.direccion} - ${data.maquina}`,
                 };
             
                 return acc;
               }, {} as Record<string, any>)
             );
-            
             
             setLlamados(loadedLlamados);
         } catch (error: any) {
@@ -238,11 +231,16 @@ export function CreateGroupDialog() {
     setParsedVoters([]);
   
     try {
-      const [fecha, clave, direccion, maquina] = selectedLlamadoId.split('|');
-  
+      const [fechaStr, clave, direccion, maquina] = selectedLlamadoId.split('|');
+      
+      const llamado = llamados.find(l => l.id === selectedLlamadoId);
+      if (!llamado || !llamado.fecha) {
+        throw new Error("No se pudo encontrar la fecha del llamado seleccionado.");
+      }
+
       const qLlamados = query(
         collection(secondaryDb, 'llamados'),
-        where('fecha', '==', fecha),
+        where('fecha', '==', llamado.fecha),
         where('clave', '==', clave),
         where('direccion', '==', direccion),
         where('maquina', '==', maquina)
@@ -275,22 +273,26 @@ export function CreateGroupDialog() {
   
       for (let i = 0; i < volunteerIds.length; i += 30) {
         const chunk = volunteerIds.slice(i, i + 30);
+        if (chunk.length === 0) continue;
+
         const qVols = query(volunteersCol, where('__name__', 'in', chunk));
         const volSnap = await getDocs(qVols);
   
         volSnap.forEach(doc => {
           const v = doc.data();
-          volunteers.push({
-            id: doc.id,
-            nombre: v.nombre || '',
-            apellido: v.apellidos || '',
-            enabled: true,
-          });
+          if (v) {
+            volunteers.push({
+                id: v.regNacional || doc.id,
+                nombre: v.nombre || '',
+                apellido: v.apellidos || '',
+                enabled: true,
+            });
+          }
         });
       }
   
       setParsedVoters(volunteers);
-      const llamadoName = llamados.find(l => l.id === selectedLlamadoId)?.nombre || selectedLlamadoId;
+      const llamadoName = llamado?.nombre || selectedLlamadoId;
       setFileName(`Importado de: ${llamadoName}`);
       toast({ title: 'Voluntarios importados', description: `Se cargaron ${volunteers.length} voluntarios del llamado.` });
   
@@ -305,7 +307,6 @@ export function CreateGroupDialog() {
       setIsImporting(false);
     }
   };
-  
 
   async function onSubmit(values: z.infer<typeof formSchema>) {
     if (!firestore || !user) return toast({ variant: 'destructive', title: 'Error de Autenticación' });
@@ -333,99 +334,101 @@ export function CreateGroupDialog() {
       <DialogTrigger asChild>
         <Button className="w-full sm:w-auto"><PlusCircle className="mr-2 h-4 w-4" />Crear Grupo</Button>
       </DialogTrigger>
-      <DialogContent className="sm:max-w-2xl max-h-[90dvh] flex flex-col">
+      <DialogContent className="sm:max-w-2xl">
         <DialogHeader>
           <DialogTitle>Crear Nuevo Grupo</DialogTitle>
           <DialogDescription>Crea un grupo de votantes subiendo un archivo o importándolo desde tu App de Listas.</DialogDescription>
         </DialogHeader>
         <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4 overflow-y-auto pr-6 pl-1">
-            <FormField control={form.control} name="name" render={({ field }) => (
-                <FormItem><FormLabel>Nombre del Grupo</FormLabel><FormControl><Input placeholder="Ej: Voluntarios de la campaña" {...field} disabled={isLoading} /></FormControl><FormMessage /></FormItem>
-            )}/>
-            
-            <Tabs defaultValue="upload" className="w-full">
-                <TabsList className="grid w-full grid-cols-2">
-                    <TabsTrigger value="upload"><FileUp className="mr-2 h-4 w-4"/>Subir Archivo</TabsTrigger>
-                    <TabsTrigger value="import"><Import className="mr-2 h-4 w-4"/>Importar de App de Listas</TabsTrigger>
-                </TabsList>
-                <TabsContent value="upload" className="pt-4">
-                    <FormItem>
-                        <FormLabel>Archivo de Votantes</FormLabel>
-                        <div className={cn("relative flex flex-col items-center justify-center w-full p-6 border-2 border-dashed rounded-lg cursor-pointer hover:border-primary/50 transition-colors", isDragging && "border-primary bg-primary/10")}
-                            onDrop={handleDrop} onDragOver={handleDragOver} onDragEnter={handleDragEnter} onDragLeave={handleDragLeave} onClick={() => document.getElementById('file-upload')?.click()}>
-                            <FileUp className="w-10 h-10 text-muted-foreground" /><p className="mt-2 text-sm text-muted-foreground"><span className="font-semibold text-primary">Haz clic para subir</span> o arrastra</p><p className="text-xs text-muted-foreground">Archivo Excel (.xlsx, .csv)</p>
-                            <Input id="file-upload" type="file" className="hidden" accept=".xlsx, .csv, application/vnd.openxmlformats-officedocument.spreadsheetml.sheet, application/vnd.ms-excel" onChange={handleFileChange} disabled={isLoading}/>
-                        </div>
-                        <FormDescription className="pt-2">
-                            Asegúrate de que tu archivo tenga una fila de cabecera. El sistema buscará automáticamente columnas que contengan 'id', 'apellido' y 'nombre'.
-                        </FormDescription>
-                    </FormItem>
-                </TabsContent>
-                 <TabsContent value="import" className="pt-4 space-y-4">
-                    <Alert>
-                        <Info className="h-4 w-4" />
-                        <AlertTitle>Conexión Automática</AlertTitle>
-                        <AlertDescription>
-                           Esta función se conecta automáticamente a tu "App de Listas". Si no funciona, asegúrate de haber añadido la configuración de Firebase de tu otra app en el archivo <code className="font-mono text-xs bg-muted px-1 py-0.5 rounded">src/components/admin/CreateGroupDialog.tsx</code>.
-                        </AlertDescription>
-                    </Alert>
-
-                    {isLoadingLlamados && (
-                        <div className="flex items-center gap-2 text-muted-foreground">
-                            <Loader2 className="h-4 w-4 animate-spin" />
-                            <span>Conectando y cargando llamados...</span>
-                        </div>
-                    )}
-
-                    {loadLlamadosError && <Alert variant="destructive"><AlertTitle>Error de Conexión</AlertTitle><AlertDescription>{loadLlamadosError}</AlertDescription></Alert>}
-
-                    {!isLoadingLlamados && !loadLlamadosError && (
-                        llamados.length > 0 ? (
-                            <div className="space-y-4 pt-4 border-t">
-                                <FormItem>
-                                    <FormLabel>1. Seleccionar Llamado</FormLabel>
-                                    <Select onValueChange={setSelectedLlamadoId} value={selectedLlamadoId} disabled={isImporting}>
-                                        <FormControl>
-                                            <SelectTrigger><SelectValue placeholder="Selecciona un llamado para importar..." /></SelectTrigger>
-                                        </FormControl>
-                                        <SelectContent>
-                                            {llamados.map((l) => (<SelectItem key={l.id} value={l.id}>{l.nombre}</SelectItem>))}
-                                        </SelectContent>
-                                    </Select>
-                                </FormItem>
-                                <Button type="button" onClick={handleImportFromLlamado} disabled={isImporting || !selectedLlamadoId || !secondaryDb}>
-                                    {isImporting ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : <Import className="mr-2 h-4 w-4" />}
-                                    2. Importar Voluntarios del Llamado
-                                </Button>
+          <form onSubmit={form.handleSubmit(onSubmit)}>
+            <div className="space-y-4 pr-4 max-h-[65vh] overflow-y-auto">
+                <FormField control={form.control} name="name" render={({ field }) => (
+                    <FormItem><FormLabel>Nombre del Grupo</FormLabel><FormControl><Input placeholder="Ej: Voluntarios de la campaña" {...field} disabled={isLoading} /></FormControl><FormMessage /></FormItem>
+                )}/>
+                
+                <Tabs defaultValue="upload" className="w-full">
+                    <TabsList className="grid w-full grid-cols-2">
+                        <TabsTrigger value="upload"><FileUp className="mr-2 h-4 w-4"/>Subir Archivo</TabsTrigger>
+                        <TabsTrigger value="import"><Import className="mr-2 h-4 w-4"/>Importar de App de Listas</TabsTrigger>
+                    </TabsList>
+                    <TabsContent value="upload" className="pt-4">
+                        <FormItem>
+                            <FormLabel>Archivo de Votantes</FormLabel>
+                            <div className={cn("relative flex flex-col items-center justify-center w-full p-6 border-2 border-dashed rounded-lg cursor-pointer hover:border-primary/50 transition-colors", isDragging && "border-primary bg-primary/10")}
+                                onDrop={handleDrop} onDragOver={handleDragOver} onDragEnter={handleDragEnter} onDragLeave={handleDragLeave} onClick={() => document.getElementById('file-upload')?.click()}>
+                                <FileUp className="w-10 h-10 text-muted-foreground" /><p className="mt-2 text-sm text-muted-foreground"><span className="font-semibold text-primary">Haz clic para subir</span> o arrastra</p><p className="text-xs text-muted-foreground">Archivo Excel (.xlsx, .csv)</p>
+                                <Input id="file-upload" type="file" className="hidden" accept=".xlsx, .csv, application/vnd.openxmlformats-officedocument.spreadsheetml.sheet, application/vnd.ms-excel" onChange={handleFileChange} disabled={isLoading}/>
                             </div>
-                        ) : (
-                             <p className="text-sm text-muted-foreground text-center py-4">No se encontraron llamados en la aplicación de listas.</p>
-                        )
-                    )}
-                </TabsContent>
-            </Tabs>
+                            <FormDescription className="pt-2">
+                                Asegúrate de que tu archivo tenga una fila de cabecera. El sistema buscará automáticamente columnas que contengan 'id', 'apellido' y 'nombre'.
+                            </FormDescription>
+                        </FormItem>
+                    </TabsContent>
+                     <TabsContent value="import" className="pt-4 space-y-4">
+                        <Alert>
+                            <Info className="h-4 w-4" />
+                            <AlertTitle>Conexión Automática</AlertTitle>
+                            <AlertDescription>
+                               Esta función se conecta automáticamente a tu "App de Listas". Si no funciona, asegúrate de haber añadido la configuración de Firebase de tu otra app en el archivo <code className="font-mono text-xs bg-muted px-1 py-0.5 rounded">src/components/admin/CreateGroupDialog.tsx</code>.
+                            </AlertDescription>
+                        </Alert>
 
-            {parsedVoters.length > 0 && (
-                <div className="space-y-2 pt-4 border-t">
-                    <div className="flex items-center justify-between"><h4 className="text-sm font-medium">Votantes a Importar: {parsedVoters.length}</h4>
-                        <Button type="button" variant="ghost" size="sm" className="h-auto px-2 py-1 text-xs" onClick={handleRemoveFile}><Trash2 className="mr-1 h-3 w-3" /> Limpiar</Button>
+                        {isLoadingLlamados && (
+                            <div className="flex items-center gap-2 text-muted-foreground">
+                                <Loader2 className="h-4 w-4 animate-spin" />
+                                <span>Conectando y cargando llamados...</span>
+                            </div>
+                        )}
+
+                        {loadLlamadosError && <Alert variant="destructive"><AlertTitle>Error de Conexión</AlertTitle><AlertDescription>{loadLlamadosError}</AlertDescription></Alert>}
+
+                        {!isLoadingLlamados && !loadLlamadosError && (
+                            llamados.length > 0 ? (
+                                <div className="space-y-4 pt-4 border-t">
+                                    <FormItem>
+                                        <FormLabel>1. Seleccionar Llamado</FormLabel>
+                                        <Select onValueChange={setSelectedLlamadoId} value={selectedLlamadoId} disabled={isImporting}>
+                                            <FormControl>
+                                                <SelectTrigger><SelectValue placeholder="Selecciona un llamado para importar..." /></SelectTrigger>
+                                            </FormControl>
+                                            <SelectContent>
+                                                {llamados.map((l) => (<SelectItem key={l.id} value={l.id}>{l.nombre}</SelectItem>))}
+                                            </SelectContent>
+                                        </Select>
+                                    </FormItem>
+                                    <Button type="button" onClick={handleImportFromLlamado} disabled={isImporting || !selectedLlamadoId || !secondaryDb}>
+                                        {isImporting ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : <Import className="mr-2 h-4 w-4" />}
+                                        2. Importar Voluntarios del Llamado
+                                    </Button>
+                                </div>
+                            ) : (
+                                 <p className="text-sm text-muted-foreground text-center py-4">No se encontraron llamados en la aplicación de listas.</p>
+                            )
+                        )}
+                    </TabsContent>
+                </Tabs>
+
+                {parsedVoters.length > 0 && (
+                    <div className="space-y-2 pt-4 border-t">
+                        <div className="flex items-center justify-between"><h4 className="text-sm font-medium">Votantes a Importar: {parsedVoters.length}</h4>
+                            <Button type="button" variant="ghost" size="sm" className="h-auto px-2 py-1 text-xs" onClick={handleRemoveFile}><Trash2 className="mr-1 h-3 w-3" /> Limpiar</Button>
+                        </div>
+                        <p className='text-sm text-muted-foreground -mt-2'>Fuente: <span className='font-medium'>{fileName}</span>. Los IDs duplicados serán omitidos.</p>
+                        <ScrollArea className="h-40 border rounded-md">
+                            <Table>
+                                <TableHeader><TableRow><TableHead>ID</TableHead><TableHead>Nombre Completo</TableHead></TableRow></TableHeader>
+                                <TableBody>
+                                    {parsedVoters.map((voter, index) => (
+                                        <TableRow key={`${voter.id}-${index}`}><TableCell className="font-mono text-xs">{voter.id}</TableCell><TableCell>{voter.nombre} {voter.apellido}</TableCell></TableRow>
+                                    ))}
+                                </TableBody>
+                            </Table>
+                        </ScrollArea>
                     </div>
-                    <p className='text-sm text-muted-foreground -mt-2'>Fuente: <span className='font-medium'>{fileName}</span>. Los IDs duplicados serán omitidos.</p>
-                    <ScrollArea className="h-40 border rounded-md">
-                        <Table>
-                            <TableHeader><TableRow><TableHead>ID</TableHead><TableHead>Nombre Completo</TableHead></TableRow></TableHeader>
-                            <TableBody>
-                                {parsedVoters.map((voter, index) => (
-                                    <TableRow key={`${voter.id}-${index}`}><TableCell className="font-mono text-xs">{voter.id}</TableCell><TableCell>{voter.nombre} {voter.apellido}</TableCell></TableRow>
-                                ))}
-                            </TableBody>
-                        </Table>
-                    </ScrollArea>
-                </div>
-            )}
+                )}
+            </div>
 
-            <DialogFooter className="pt-4 sticky bottom-0 bg-background pb-0 -mx-6 px-6 border-t">
+            <DialogFooter className="pt-4 border-t mt-4">
               <Button type="button" variant="ghost" onClick={() => { setOpen(false); resetState(); }} disabled={isLoading}>Cancelar</Button>
               <Button type="submit" disabled={isLoading || parsedVoters.length === 0}>
                 {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
