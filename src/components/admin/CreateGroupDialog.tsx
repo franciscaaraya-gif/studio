@@ -5,7 +5,7 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import * as XLSX from 'xlsx';
-import { addDoc, collection, serverTimestamp, getDocs, query, where, type Firestore, doc } from 'firebase/firestore';
+import { addDoc, collection, serverTimestamp, getDocs, orderBy, query, where, type Firestore, doc } from 'firebase/firestore';
 import { initializeApp, getApp, type FirebaseApp, deleteApp } from 'firebase/app';
 import { getFirestore } from 'firebase/firestore';
 import { FileUp, Loader2, PlusCircle, Trash2, Import, Info } from 'lucide-react';
