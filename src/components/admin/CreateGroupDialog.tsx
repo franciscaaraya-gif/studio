@@ -162,39 +162,60 @@ export function CreateGroupDialog() {
   
   const handleImportFromApp = () => {
     /*
-    // --- GUÍA PARA LA IMPORTACIÓN DESDE TU API ---
-    // 1. Crea y despliega la Cloud Function en tu otro proyecto de Firebase usando el código que te proporcioné.
+    // --- GUÍA PARA LA IMPORTACIÓN CON CLOUD FUNCTIONS ---
+    // 1. Despliega la Cloud Function en tu otro proyecto de Firebase usando el código que te proporcioné para 'getVoluntariosFromLatestLlamado'.
     // 2. Al desplegar, Firebase te dará una URL para esa función.
-    // 3. Pega esa URL abajo y descomenta la llamada a la función.
+    // 3. Pega esa URL abajo en la constante 'apiUrl' y descomenta la llamada a 'fetchVotersFromApi()'.
 
     const fetchVotersFromApi = async () => {
+        setIsLoading(true);
         try {
             // REEMPLAZA ESTA URL por la que te dio Firebase para tu Cloud Function.
-            const apiUrl = 'https://getvoluntarios-xxxxxxxx-uc.a.run.app';
+            // Ej: 'https://getvoluntariosfromlatestllamado-xxxxxxxx-uc.a.run.app'
+            const apiUrl = 'URL_DE_TU_CLOUD_FUNCTION_AQUI';
+            
+            if (apiUrl === 'URL_DE_TU_CLOUD_FUNCTION_AQUI') {
+                 toast({
+                    variant: 'destructive',
+                    title: 'Configuración Requerida',
+                    description: "Edita 'CreateGroupDialog.tsx' y reemplaza la URL de la API de importación.",
+                });
+                setIsLoading(false);
+                return;
+            }
+            
             const response = await fetch(apiUrl);
             
             if (!response.ok) {
-                throw new Error(`Error de red: ${'${response.status}'}`);
+                const errorText = await response.text();
+                throw new Error(`Error de red: ${'${response.status}'} - ${errorText}`);
             }
 
-            // La Cloud Function ya devuelve los datos en el formato que necesitamos:
-            // [{ id: '...', nombre: '...', apellido: '...', enabled: true }]
             const votersFromApi = await response.json();
             
-            setParsedVoters(votersFromApi);
-            setFileName('Importado desde la App de Listas');
-            toast({
-                title: '¡Lista importada!',
-                description: `Se han cargado ${'${votersFromApi.length}'} votantes.`,
-            });
+            if (votersFromApi.length === 0) {
+                 toast({
+                    title: 'Lista Vacía',
+                    description: `La importación funcionó, pero el llamado más reciente no tiene voluntarios.`,
+                });
+            } else {
+                setParsedVoters(votersFromApi);
+                setFileName(`Importado del último llamado (${'${votersFromApi.length}'} personas)`);
+                toast({
+                    title: '¡Lista importada!',
+                    description: `Se han cargado ${'${votersFromApi.length}'} votantes.`,
+                });
+            }
 
-        } catch (error) {
+        } catch (error: any) {
             console.error("Error al importar desde la API:", error);
             toast({
                 variant: 'destructive',
                 title: 'Error de importación',
-                description: 'No se pudo obtener la lista desde la API. Revisa la consola del navegador para más detalles.',
+                description: error.message || 'No se pudo obtener la lista desde la API. Revisa la consola para más detalles.',
             });
+        } finally {
+            setIsLoading(false);
         }
     };
     
@@ -203,9 +224,10 @@ export function CreateGroupDialog() {
     */
 
     // --- SIMULACIÓN ACTUAL (REEMPLAZAR CON LA LÓGICA DE ARRIBA) ---
+    setIsLoading(true);
     toast({
         title: 'Simulación de Importación',
-        description: 'Esto es un ejemplo. Configura tu API y descomenta el código de arriba para una importación real.',
+        description: "Esta es una simulación. Para una importación real, configura tu Cloud Function y descomenta el código en este archivo.",
     });
     const exampleVoters = [
         { id: 'vol_001', apellido: 'García', nombre: 'Ana', enabled: true },
@@ -213,7 +235,8 @@ export function CreateGroupDialog() {
         { id: 'vol_003', apellido: 'López', nombre: 'Elena', enabled: true },
     ];
     setParsedVoters(exampleVoters);
-    setFileName('Importado desde App (Ejemplo)');
+    setFileName('Llamado de Ejemplo (Simulado)');
+    setTimeout(() => setIsLoading(false), 500);
   };
 
 
@@ -334,11 +357,12 @@ export function CreateGroupDialog() {
                     <Import className="w-12 h-12 text-muted-foreground mb-4" />
                     <h3 className="text-lg font-semibold">Importar desde tu App de Listas</h3>
                     <p className="text-sm text-muted-foreground mt-2 mb-4 max-w-sm">
-                        Conecta y selecciona una lista de votantes desde tu aplicación externa.
+                        Conecta y trae la lista de voluntarios del llamado más reciente.
                     </p>
-                    <Button type="button" onClick={handleImportFromApp}>
+                    <Button type="button" onClick={handleImportFromApp} disabled={isLoading}>
+                         {isLoading && activeTab === 'import' && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                         <Import className="mr-2 h-4 w-4" />
-                        Conectar y Seleccionar Lista
+                        Importar Último Llamado
                     </Button>
                 </div>
               </TabsContent>
@@ -356,7 +380,7 @@ export function CreateGroupDialog() {
                         </Button>
                     </div>
                     <p className='text-sm text-muted-foreground -mt-2'>
-                        Archivo: <span className='font-medium'>{fileName}</span>. Duplicados serán omitidos.
+                        Fuente: <span className='font-medium'>{fileName}</span>. Duplicados serán omitidos.
                     </p>
                     <ScrollArea className="h-40 border rounded-md">
                         <Table>
