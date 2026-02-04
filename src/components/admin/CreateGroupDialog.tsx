@@ -147,19 +147,19 @@ export function CreateGroupDialog() {
     setParsedVoters([]);
     
     // --- GUÍA DE CONFIGURACIÓN DE API ---
-    // 1. Despliega la Cloud Function 'getLlamados' en tu otro proyecto.
-    // 2. Pega la URL que te da Firebase en la constante de abajo.
+    // 1. Despliega la Cloud Function 'getLlamados' en tu otro proyecto de Firebase.
+    // 2. Al desplegarla, Firebase te dará una URL. Pégala en la constante de abajo.
     const getLlamadosApiUrl = 'URL_DE_TU_FUNCION_GETLLAMADOS_AQUI';
 
     if (getLlamadosApiUrl === 'URL_DE_TU_FUNCION_GETLLAMADOS_AQUI') {
-        toast({ variant: "destructive", title: "Configuración Requerida", description: "Edita 'CreateGroupDialog.tsx' y configura la URL de la API 'getLlamados'." });
+        toast({ variant: "destructive", title: "Configuración Requerida", description: "Edita 'CreateGroupDialog.tsx' y configura la URL de la API 'getLlamados'.", duration: 8000 });
         setIsImportLoading(false);
         return;
     }
 
     try {
         const response = await fetch(getLlamadosApiUrl);
-        if (!response.ok) throw new Error(`Error de red: ${response.status}`);
+        if (!response.ok) throw new Error(`Error de red: ${response.statusText}`);
         
         const data: Llamado[] = await response.json();
         if (data.length === 0) {
@@ -186,18 +186,19 @@ export function CreateGroupDialog() {
     
     // --- GUÍA DE CONFIGURACIÓN DE API ---
     // 1. Despliega la Cloud Function 'getVoluntariosFromLlamado' en tu otro proyecto.
-    // 2. Pega la URL que te da Firebase en la constante de abajo.
+    // 2. Al desplegarla, Firebase te dará una URL. Pégala en la constante de abajo.
     const getVoluntariosApiUrl = 'URL_DE_TU_FUNCION_GETVOLUNTARIOS_AQUI';
 
     if (getVoluntariosApiUrl === 'URL_DE_TU_FUNCION_GETVOLUNTARIOS_AQUI') {
-        toast({ variant: "destructive", title: "Configuración Requerida", description: "Edita 'CreateGroupDialog.tsx' y configura la URL de la API 'getVoluntariosFromLlamado'." });
+        toast({ variant: "destructive", title: "Configuración Requerida", description: "Edita 'CreateGroupDialog.tsx' y configura la URL de la API 'getVoluntariosFromLlamado'.", duration: 8000 });
         setIsImportLoading(false);
         return;
     }
     
     try {
+        // La URL debe incluir el ID del llamado como parámetro de consulta.
         const response = await fetch(`${getVoluntariosApiUrl}?id=${llamadoId}`);
-        if (!response.ok) throw new Error(`Error de red: ${response.status}`);
+        if (!response.ok) throw new Error(`Error de red: ${response.statusText}`);
         
         const data: ParsedVoter[] = await response.json();
         if (data.length === 0) {
@@ -297,14 +298,14 @@ export function CreateGroupDialog() {
                                 <SelectContent>
                                     {llamados.map(l => (
                                         <SelectItem key={l.id} value={l.id}>
-                                            {l.nombre} - {format(new Date(l.fecha.seconds * 1000), "d MMM yyyy", { locale: es })}
+                                            {l.nombre} - {l.fecha ? format(new Date(l.fecha.seconds * 1000), "d MMM yyyy", { locale: es }) : ''}
                                         </SelectItem>
                                     ))}
                                 </SelectContent>
                             </Select>
                         </FormItem>
                         
-                        <Button type="button" variant="outline" onClick={() => setImportStep('initial')} className='w-full'>
+                        <Button type="button" variant="outline" onClick={() => { setImportStep('initial'); setLlamados([]); setSelectedLlamadoId(''); }} className='w-full'>
                             Volver a buscar
                         </Button>
                     </div>
@@ -344,3 +345,5 @@ export function CreateGroupDialog() {
     </Dialog>
   );
 }
+
+    
