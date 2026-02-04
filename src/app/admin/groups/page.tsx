@@ -134,6 +134,7 @@ function GroupsList() {
     );
   }
 
+  
   return (
     <>
       <div className="md:hidden space-y-4">
