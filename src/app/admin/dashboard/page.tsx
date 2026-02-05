@@ -41,6 +41,7 @@ const statusText: { [key: string]: string } = {
   closed: 'Cerrada',
 };
 
+// Component to display poll card in mobile view
 function PollCard({ poll, onDeleteClick }: { poll: Poll, onDeleteClick: (poll: Poll) => void }) {
   return (
     <Card>
@@ -83,80 +84,28 @@ function PollCard({ poll, onDeleteClick }: { poll: Poll, onDeleteClick: (poll: P
   );
 }
 
-
-export default function DashboardPage() {
-  const firestore = useFirestore();
-  const { user } = useUser();
-  const { toast } = useToast();
-  
-  // State for the single, global dialog. It holds the poll to be deleted.
-  const [pollToDelete, setPollToDelete] = useState<Poll | null>(null);
-
-  const pollsQuery = useMemoFirebase(() => {
+// This component fetches and displays data, but does NOT manage the dialog
+function DashboardContents({ onPollDeleteClick }: { onPollDeleteClick: (poll: Poll) => void }) {
+    const firestore = useFirestore();
+    const { user } = useUser();
+    
+    const pollsQuery = useMemoFirebase(() => {
         if (!firestore || !user) return null;
         return query(collection(firestore, 'admins', user.uid, 'polls'), orderBy('createdAt', 'desc'));
     }, [firestore, user]);
 
-  const groupsQuery = useMemoFirebase(() => {
-      if (!firestore || !user) return null;
-      return query(collection(firestore, 'admins', user.uid, 'groups'));
-  }, [firestore, user]);
+    const groupsQuery = useMemoFirebase(() => {
+        if (!firestore || !user) return null;
+        return query(collection(firestore, 'admins', user.uid, 'groups'));
+    }, [firestore, user]);
 
-  const { data: polls, isLoading: pollsLoading } = useCollection<Poll>(pollsQuery);
-  const { data: groups, isLoading: groupsLoading } = useCollection<VoterGroup>(groupsQuery);
-
-
-  const handleDeleteConfirm = async () => {
-    if (!pollToDelete || !firestore || !user) return;
+    const { data: polls, isLoading: pollsLoading } = useCollection<Poll>(pollsQuery);
+    const { data: groups, isLoading: groupsLoading } = useCollection<VoterGroup>(groupsQuery);
     
-    const pollToDeleteCopy = { ...pollToDelete };
+    const isLoading = pollsLoading || groupsLoading;
 
-    // Close the dialog UI *before* the async operation.
-    // This is the key to preventing the "zombie overlay" bug.
-    setPollToDelete(null);
-
-    toast({
-        title: "Eliminando encuesta...",
-        description: `Por favor, espera un momento.`,
-    });
-
-    const pollRef = doc(firestore, 'admins', user.uid, 'polls', pollToDeleteCopy.id);
-    const lookupRef = doc(firestore, 'poll-lookup', pollToDeleteCopy.id);
-
-    try {
-        const batch = writeBatch(firestore);
-        batch.delete(pollRef);
-        batch.delete(lookupRef);
-        await batch.commit();
-
-        toast({
-            title: "¡Encuesta Eliminada!",
-            description: `La encuesta "${pollToDeleteCopy.question}" se eliminó correctamente.`,
-        });
-    } catch(error: any) {
-        errorEmitter.emit('permission-error', new FirestorePermissionError({
-            path: pollRef.path,
-            operation: 'delete',
-        }));
-        toast({
-             variant: "destructive",
-             title: "Error al eliminar",
-             description: "No se pudo eliminar la encuesta. Es posible que no tengas permisos."
-        });
-    }
-  };
-  
-  const isLoading = pollsLoading || groupsLoading;
-
-
-  return (
-    <div className="space-y-6">
-      <CardHeader className="p-0">
-        <CardTitle className="text-3xl font-bold tracking-tight font-headline">Encuestas</CardTitle>
-        <CardDescription>Crea y administra tus encuestas de votación anónima.</CardDescription>
-      </CardHeader>
-      
-      <Card>
+    return (
+        <Card>
           <CardHeader>
               <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
                   <CardTitle>Tus Encuestas</CardTitle>
@@ -220,7 +169,7 @@ export default function DashboardPage() {
                 <>
                     {/* Mobile List */}
                     <div className="md:hidden space-y-4">
-                        {polls.map((poll) => <PollCard key={poll.id} poll={poll} onDeleteClick={setPollToDelete} />)}
+                        {polls.map((poll) => <PollCard key={poll.id} poll={poll} onDeleteClick={onPollDeleteClick} />)}
                     </div>
                     {/* Desktop Table */}
                     <div className="hidden md:block">
@@ -251,7 +200,7 @@ export default function DashboardPage() {
                                     <DropdownMenuItem asChild><Link href={`/admin/polls/${poll.id}`}>Ver detalles</Link></DropdownMenuItem>
                                     <DropdownMenuItem
                                         className="text-destructive"
-                                        onClick={() => setPollToDelete(poll)}
+                                        onClick={() => onPollDeleteClick(poll)}
                                     >
                                         Eliminar
                                     </DropdownMenuItem>
@@ -267,9 +216,68 @@ export default function DashboardPage() {
             )}
           </CardContent>
       </Card>
+    );
+}
+
+
+// This is the main page component. It only manages the dialog state and renders the contents.
+export default function DashboardPage() {
+  const firestore = useFirestore();
+  const { user } = useUser();
+  const { toast } = useToast();
+  
+  // State for the single, global dialog. It holds the poll to be deleted.
+  const [pollToDelete, setPollToDelete] = useState<Poll | null>(null);
+
+  const handleDeleteConfirm = async () => {
+    if (!pollToDelete || !firestore || !user) return;
+    
+    // The key change: create a copy and close the dialog *before* the async operation.
+    const pollToDeleteCopy = { ...pollToDelete };
+    setPollToDelete(null); // This closes the dialog, allowing Radix to animate out cleanly
+
+    toast({
+        title: "Eliminando encuesta...",
+        description: `Por favor, espera un momento.`,
+    });
+
+    const pollRef = doc(firestore, 'admins', user.uid, 'polls', pollToDeleteCopy.id);
+    const lookupRef = doc(firestore, 'poll-lookup', pollToDeleteCopy.id);
+
+    try {
+        const batch = writeBatch(firestore);
+        batch.delete(pollRef);
+        batch.delete(lookupRef);
+        await batch.commit();
+
+        toast({
+            title: "¡Encuesta Eliminada!",
+            description: `La encuesta "${pollToDeleteCopy.question}" se eliminó correctamente.`,
+        });
+    } catch(error: any) {
+        errorEmitter.emit('permission-error', new FirestorePermissionError({
+            path: pollRef.path,
+            operation: 'delete',
+        }));
+        toast({
+             variant: "destructive",
+             title: "Error al eliminar",
+             description: "No se pudo eliminar la encuesta. Es posible que no tengas permisos."
+        });
+    }
+  };
+  
+  return (
+    <div className="space-y-6">
+      <CardHeader className="p-0">
+        <CardTitle className="text-3xl font-bold tracking-tight font-headline">Encuestas</CardTitle>
+        <CardDescription>Crea y administra tus encuestas de votación anónima.</CardDescription>
+      </CardHeader>
+      
+      <DashboardContents onPollDeleteClick={setPollToDelete} />
 
       {/* This is the single, global AlertDialog. It is controlled by `pollToDelete` state. */}
-       <AlertDialog open={!!pollToDelete} onOpenChange={(open) => !open && setPollToDelete(null)}>
+      <AlertDialog open={!!pollToDelete} onOpenChange={(open) => !open && setPollToDelete(null)}>
         <AlertDialogContent>
             <AlertDialogHeader>
                 <AlertDialogTitle>¿Estás realmente seguro?</AlertDialogTitle>
