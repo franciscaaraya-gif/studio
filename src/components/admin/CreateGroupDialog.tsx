@@ -142,17 +142,16 @@ export function CreateGroupDialog() {
                 const data = doc.data();
                 if (!data) return acc;
 
-                let fecha = null;
-                // Check if data.fecha exists and has a toDate method (is a Firestore Timestamp)
-                if (data.fecha && typeof data.fecha.toDate === 'function') {
-                    fecha = data.fecha.toDate();
-                } 
-                // Fallback for plain objects from serialization
-                else if (data.fecha && typeof data.fecha.seconds === 'number') {
-                    fecha = new Date(data.fecha.seconds * 1000);
-                }
+                let fechaString = 'Fecha inválida';
+                const fechaForQuery = data.fecha; // Keep original value for querying
 
-                const fechaString = fecha ? fecha.toLocaleDateString('es-ES') : 'Fecha inválida';
+                if (data.fecha && typeof data.fecha === 'string' && data.fecha.match(/^\d{4}-\d{2}-\d{2}$/)) {
+                    const [year, month, day] = data.fecha.split('-');
+                    fechaString = `${day}/${month}/${year}`;
+                } else if (data.fecha && typeof data.fecha.toDate === 'function') { // Fallback for Timestamps
+                    const fechaDate = data.fecha.toDate();
+                    fechaString = fechaDate.toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit', year: 'numeric' });
+                }
                 
                 const key = `${fechaString}|${data.clave}|${data.direccion}|${data.maquina}`;
             
@@ -160,7 +159,7 @@ export function CreateGroupDialog() {
             
                 acc[key] = {
                   id: key,
-                  fecha: data.fecha, // Keep original timestamp object for later queries
+                  fecha: fechaForQuery, // Use original value for querying later
                   nombre: `${fechaString} - ${data.clave || 'S/C'} - ${data.direccion || 'S/D'} - ${data.maquina || 'S/M'}`,
                 };
             
@@ -356,7 +355,7 @@ export function CreateGroupDialog() {
       <DialogTrigger asChild>
         <Button className="w-full sm:w-auto"><PlusCircle className="mr-2 h-4 w-4" />Crear Grupo</Button>
       </DialogTrigger>
-      <DialogContent className="sm:max-w-2xl max-h-[90dvh] flex flex-col">
+      <DialogContent className="sm:max-w-2xl max-h-[90dvh] flex flex-col" onInteractOutside={(e) => e.preventDefault()}>
         <DialogHeader>
           <DialogTitle>Crear Nuevo Grupo</DialogTitle>
           <DialogDescription>Crea un grupo de votantes subiendo un archivo o importándolo desde tu App de Listas.</DialogDescription>
@@ -444,7 +443,7 @@ export function CreateGroupDialog() {
             </Form>
         </div>
 
-        <DialogFooter className="pt-4 border-t -mb-6 pb-6 -mx-6 px-6 bg-background rounded-b-lg">
+        <DialogFooter className="pt-4 border-t mt-auto">
           <Button type="button" variant="ghost" onClick={() => { setOpen(false); resetState(); }} disabled={isLoading}>Cancelar</Button>
           <Button type="submit" form="create-group-form" disabled={isLoading || parsedVoters.length === 0}>
             {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
@@ -455,5 +454,3 @@ export function CreateGroupDialog() {
     </Dialog>
   );
 }
-
-    

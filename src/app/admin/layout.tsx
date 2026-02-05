@@ -12,32 +12,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 
 
-export default function AdminLayout({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
-  const { user, isUserLoading: loading } = useUser();
-  const router = useRouter();
-  const pathname = usePathname();
-
-  useEffect(() => {
-    if (loading) {
-      return; // Do nothing while loading
-    }
-    
-    // If the user is logged in and on the login page, redirect to the dashboard
-    if (user && pathname === "/admin/login") {
-      router.replace("/admin/dashboard");
-    }
-    
-    // If the user is not logged in and not on the login page, redirect to login
-    if (!user && pathname !== "/admin/login") {
-      router.replace("/admin/login");
-    }
-  }, [user, loading, pathname, router]);
-
-  const skeletonLayout = (content: ReactNode) => (
+const FullScreenSkeleton = ({ children }: { children: ReactNode }) => (
     <SidebarProvider>
         <Sidebar>
             <SidebarHeader>
@@ -70,45 +45,75 @@ export default function AdminLayout({
                 <div className="w-7" />
             </header>
             <main className="flex-1 p-4 sm:p-6">
-                {content}
+                {children}
             </main>
         </SidebarInset>
     </SidebarProvider>
-  );
+);
 
-  if (loading) {
-    // Show a skeleton layout while authenticating.
-    // Next.js will pass the route's loading.tsx as children here.
-    return skeletonLayout(children);
-  }
-
-  // This logic prevents a flash of content before redirection.
-  if ((!user && pathname !== "/admin/login") || (user && pathname === "/admin/login")) {
-    // Show the layout skeleton with a generic content skeleton inside.
-    return skeletonLayout(
-        <div className="space-y-6">
-           <CardHeader className="p-0">
-               <Skeleton className="h-9 w-64" />
-               <Skeleton className="h-5 w-80 mt-2" />
+const GenericContentSkeleton = () => (
+    <div className="space-y-6">
+       <CardHeader className="p-0">
+           <Skeleton className="h-9 w-64" />
+           <Skeleton className="h-5 w-80 mt-2" />
+       </CardHeader>
+       <Card>
+           <CardHeader>
+             <Skeleton className="h-10 w-full" />
            </CardHeader>
-           <Card>
-               <CardHeader>
-                 <Skeleton className="h-10 w-full" />
-               </CardHeader>
-               <CardContent>
-                 <Skeleton className="h-40 w-full" />
-               </CardContent>
-           </Card>
-         </div>
-    );
+           <CardContent>
+             <Skeleton className="h-40 w-full" />
+           </CardContent>
+       </Card>
+     </div>
+);
+
+
+export default function AdminLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
+  const { user, isUserLoading: loading } = useUser();
+  const router = useRouter();
+  const pathname = usePathname();
+
+  useEffect(() => {
+    if (loading) {
+      return; // Wait until the auth state is known
+    }
+
+    const isLoginPage = pathname === "/admin/login";
+
+    // If there's no user and we're not on the login page, redirect to login
+    if (!user && !isLoginPage) {
+      router.replace("/admin/login");
+    }
+
+    // If there is a user and we're on the login page, redirect to the dashboard
+    if (user && isLoginPage) {
+      router.replace("/admin/dashboard");
+    }
+  }, [user, loading, pathname, router]);
+
+  // While loading, show the route-specific loading.tsx skeleton
+  if (loading) {
+    return <FullScreenSkeleton>{children}</FullScreenSkeleton>;
   }
 
-  // If on login page, don't show the sidebar layout
-  if (pathname === "/admin/login") {
+  const isLoginPage = pathname === "/admin/login";
+
+  // If a redirect is about to happen, show a generic skeleton to prevent content flash
+  if ((!user && !isLoginPage) || (user && isLoginPage)) {
+    return <FullScreenSkeleton><GenericContentSkeleton /></FullScreenSkeleton>;
+  }
+
+  // If we are on the login page (and not redirecting), show only its content
+  if (isLoginPage) {
     return <>{children}</>;
   }
   
-  // For all other admin pages, show the sidebar layout
+  // Otherwise, the user is logged in on a protected page, show the full layout
   return (
     <SidebarProvider>
         <AdminSidebar />
