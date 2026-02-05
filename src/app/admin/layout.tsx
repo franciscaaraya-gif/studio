@@ -78,42 +78,36 @@ export default function AdminLayout({
   const router = useRouter();
   const pathname = usePathname();
 
+  const isLoginPage = pathname === "/admin/login";
+
   useEffect(() => {
     if (loading) {
-      return; // Wait until the auth state is known
+      return; // Still loading, do nothing.
     }
 
-    const isLoginPage = pathname === "/admin/login";
-
-    // If there's no user and we're not on the login page, redirect to login
+    // Auth state is resolved. Now, check for redirects.
     if (!user && !isLoginPage) {
       router.replace("/admin/login");
     }
-
-    // If there is a user and we're on the login page, redirect to the dashboard
     if (user && isLoginPage) {
       router.replace("/admin/dashboard");
     }
   }, [user, loading, pathname, router]);
 
-  // While loading, show the route-specific loading.tsx skeleton
-  if (loading) {
-    return <FullScreenSkeleton>{children}</FullScreenSkeleton>;
-  }
-
-  const isLoginPage = pathname === "/admin/login";
-
-  // If a redirect is about to happen, show a generic skeleton to prevent content flash
-  if ((!user && !isLoginPage) || (user && isLoginPage)) {
-    return <FullScreenSkeleton><GenericContentSkeleton /></FullScreenSkeleton>;
-  }
-
-  // If we are on the login page (and not redirecting), show only its content
+  // 1. If we are on the login page, render it.
+  // The useEffect will handle redirecting away if the user is already logged in.
   if (isLoginPage) {
     return <>{children}</>;
   }
-  
-  // Otherwise, the user is logged in on a protected page, show the full layout
+
+  // 2. If we are on a protected page, we MUST wait for the user to be loaded and present.
+  // While loading, or if there's no user (and a redirect is pending), show a full-screen skeleton.
+  if (loading || !user) {
+    // We pass a generic skeleton as children, NOT the actual page content.
+    return <FullScreenSkeleton><GenericContentSkeleton /></FullScreenSkeleton>;
+  }
+
+  // 3. If we reach here, user is loaded and we are on a protected page. Render the full layout.
   return (
     <SidebarProvider>
         <AdminSidebar />
