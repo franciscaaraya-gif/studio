@@ -111,12 +111,12 @@ export function CreateGroupDialog() {
         // 3. Selecciona la app web y busca el objeto de configuración de Firebase (firebaseConfig).
         // 4. Copia el objeto completo y pégalo aquí, reemplazando el objeto "secondaryFirebaseConfig".
         const secondaryFirebaseConfig = {
-          apiKey: "TU_API_KEY_AQUI", // Ejemplo: "AIzaSy...4U"
-          authDomain: "tu-proyecto.firebaseapp.com",
-          projectId: "tu-proyecto",
-          storageBucket: "tu-proyecto.appspot.com",
-          messagingSenderId: "1234567890",
-          appId: "1:1234567890:web:abcdef123456"
+          apiKey: process.env.EXTERNAL_PROJECT_API_KEY,
+          authDomain: "ma-apps-2d75f.firebaseapp.com",
+          projectId: "ma-apps-2d75f",
+          storageBucket: "ma-apps-2d75f.firebasestorage.app",
+          messagingSenderId: "841893715709",
+          appId: "1:841893715709:web:30918447bb56fca4b92894"
         };
         // -----------------------------
 
