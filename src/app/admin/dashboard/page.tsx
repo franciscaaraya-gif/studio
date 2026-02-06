@@ -1,10 +1,10 @@
 'use client';
 
-import { collection, query, orderBy, doc, writeBatch } from 'firebase/firestore';
+import { collection, query, orderBy, doc, writeBatch, deleteDoc } from 'firebase/firestore';
 import Link from 'next/link';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
-import { MoreHorizontal, Users } from 'lucide-react';
+import { MoreHorizontal, Users, PlusCircle } from 'lucide-react';
 import { useState } from 'react';
 
 import { useFirestore, useCollection, useUser, useMemoFirebase } from '@/firebase';
@@ -62,68 +62,10 @@ function PollCard({ poll }: { poll: Poll }) {
   );
 }
 
-function PollsList() {
-  const firestore = useFirestore();
-  const { user } = useUser();
-  const { toast } = useToast();
-  const [isAlertOpen, setIsAlertOpen] = useState(false);
-  const [pollToDelete, setPollToDelete] = useState<Poll | null>(null);
+function PollsList({ polls, groups, isLoading, onPollDeleteClick }: { polls: Poll[] | null, groups: VoterGroup[] | null, isLoading: boolean, onPollDeleteClick: (poll: Poll) => void }) {
 
-  const pollsQuery = useMemoFirebase(() => {
-    if (!firestore || !user) return null;
-    return query(collection(firestore, 'admins', user.uid, 'polls'), orderBy('createdAt', 'desc'));
-  }, [firestore, user]);
-
-  const groupsQuery = useMemoFirebase(() => {
-    if (!firestore || !user) return null;
-    return query(collection(firestore, 'admins', user.uid, 'groups'));
-  }, [firestore, user]);
-
-  const { data: polls, isLoading: pollsLoading } = useCollection<Poll>(pollsQuery);
-  const { data: groups, isLoading: groupsLoading } = useCollection<VoterGroup>(groupsQuery);
-
-  const handleDeleteClick = (poll: Poll) => {
-    setPollToDelete(poll);
-    setIsAlertOpen(true);
-  };
-
-  const handleDeleteConfirm = async () => {
-    if (!pollToDelete || !firestore || !user) return;
-
-    const pollRef = doc(firestore, 'admins', user.uid, 'polls', pollToDelete.id);
-    const lookupRef = doc(firestore, 'poll-lookup', pollToDelete.id);
-
-    try {
-        const batch = writeBatch(firestore);
-        batch.delete(pollRef);
-        batch.delete(lookupRef);
-        await batch.commit();
-
-        toast({
-            title: "Encuesta Eliminada",
-            description: `La encuesta "${pollToDelete.question}" ha sido eliminada.`,
-        });
-    } catch(error: any) {
-        const permissionError = new FirestorePermissionError({
-            path: pollRef.path,
-            operation: 'delete',
-        });
-        errorEmitter.emit('permission-error', permissionError);
-        toast({
-             variant: "destructive",
-             title: "Error al eliminar",
-             description: "No se pudo eliminar la encuesta. Es posible que no tengas permisos."
-        })
-    } finally {
-        setIsAlertOpen(false);
-        setPollToDelete(null);
-    }
-  };
-
-
-  if (pollsLoading || groupsLoading) {
+  if (isLoading) {
     // Muestra el esqueleto de carga mientras se obtienen los datos
-    // Coincide con el `loading.tsx` para una transición suave.
     return (
       <>
         <div className="md:hidden space-y-4">
@@ -210,7 +152,7 @@ function PollsList() {
                       <DropdownMenuItem asChild><Link href={`/admin/polls/${poll.id}`}>Ver detalles</Link></DropdownMenuItem>
                       <DropdownMenuItem
                         className="text-destructive"
-                        onClick={() => handleDeleteClick(poll)}
+                        onClick={() => onPollDeleteClick(poll)}
                       >
                         Eliminar
                       </DropdownMenuItem>
@@ -222,29 +164,77 @@ function PollsList() {
           </TableBody>
         </Table>
       </div>
-      <AlertDialog open={isAlertOpen} onOpenChange={setIsAlertOpen}>
-        <AlertDialogContent>
-            <AlertDialogHeader>
-                <AlertDialogTitle>¿Estás realmente seguro?</AlertDialogTitle>
-                <AlertDialogDescription>
-                    Esta acción no se puede deshacer. Se eliminará permanentemente la encuesta
-                    <span className="font-semibold"> {pollToDelete?.question}</span> y todos sus datos asociados.
-                    Los votos no podrán ser recuperados.
-                </AlertDialogDescription>
-            </AlertDialogHeader>
-            <AlertDialogFooter>
-                <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                <AlertDialogAction onClick={handleDeleteConfirm} className={buttonVariants({ variant: "destructive" })}>
-                    Eliminar Permanentemente
-                </AlertDialogAction>
-            </AlertDialogFooter>
-        </AlertDialogContent>
-    </AlertDialog>
     </>
   );
 }
 
 export default function DashboardPage() {
+  const firestore = useFirestore();
+  const { user } = useUser();
+  const { toast } = useToast();
+  
+  const [pollToDelete, setPollToDelete] = useState<Poll | null>(null);
+  
+  const pollsQuery = useMemoFirebase(() => {
+    if (!firestore || !user) return null;
+    return query(collection(firestore, 'admins', user.uid, 'polls'), orderBy('createdAt', 'desc'));
+  }, [firestore, user]);
+
+  const groupsQuery = useMemoFirebase(() => {
+    if (!firestore || !user) return null;
+    return query(collection(firestore, 'admins', user.uid, 'groups'));
+  }, [firestore, user]);
+
+  const { data: polls, isLoading: pollsLoading } = useCollection<Poll>(pollsQuery);
+  const { data: groups, isLoading: groupsLoading } = useCollection<VoterGroup>(groupsQuery);
+
+  const handlePollDeleteClick = (poll: Poll) => {
+    setPollToDelete(poll);
+  };
+  
+  const handlePollDeleteCancel = () => {
+    setPollToDelete(null);
+  };
+
+  const handlePollDeleteConfirm = async () => {
+    if (!pollToDelete || !firestore || !user) return;
+
+    const pollRef = doc(firestore, 'admins', user.uid, 'polls', pollToDelete.id);
+    const lookupRef = doc(firestore, 'poll-lookup', pollToDelete.id);
+    const pollQuestion = pollToDelete.question; // Store before state is cleared
+
+    // Close dialog immediately to prevent Radix bug
+    setPollToDelete(null);
+    
+    toast({
+      title: "Eliminando encuesta...",
+      description: `Por favor espera mientras se elimina "${pollQuestion}".`
+    });
+
+    try {
+        const batch = writeBatch(firestore);
+        batch.delete(pollRef);
+        batch.delete(lookupRef);
+        await batch.commit();
+
+        toast({
+            title: "Encuesta Eliminada",
+            description: `La encuesta "${pollQuestion}" ha sido eliminada.`,
+        });
+    } catch(error: any) {
+        errorEmitter.emit('permission-error', new FirestorePermissionError({
+            path: pollRef.path,
+            operation: 'delete',
+        }));
+        toast({
+             variant: "destructive",
+             title: "Error al eliminar",
+             description: "No se pudo eliminar la encuesta. Es posible que no tengas permisos."
+        })
+    }
+  };
+
+
   return (
     <div className="space-y-6">
       <CardHeader className="p-0">
@@ -259,9 +249,32 @@ export default function DashboardPage() {
           </div>
         </CardHeader>
         <CardContent>
-          <PollsList />
+          <PollsList 
+            polls={polls} 
+            groups={groups} 
+            isLoading={pollsLoading || groupsLoading}
+            onPollDeleteClick={handlePollDeleteClick}
+          />
         </CardContent>
       </Card>
+      <AlertDialog open={!!pollToDelete} onOpenChange={(open) => !open && handlePollDeleteCancel()}>
+        <AlertDialogContent>
+            <AlertDialogHeader>
+                <AlertDialogTitle>¿Estás realmente seguro?</AlertDialogTitle>
+                <AlertDialogDescription>
+                    Esta acción no se puede deshacer. Se eliminará permanentemente la encuesta
+                    <span className="font-semibold"> {pollToDelete?.question}</span> y todos sus datos asociados.
+                    Los votos no podrán ser recuperados.
+                </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+                <AlertDialogCancel onClick={handlePollDeleteCancel}>Cancelar</AlertDialogCancel>
+                <AlertDialogAction onClick={handlePollDeleteConfirm} className={buttonVariants({ variant: "destructive" })}>
+                    Eliminar Permanentemente
+                </AlertDialogAction>
+            </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
